@@ -1,6 +1,11 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
@@ -11,10 +16,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Health check
-app.get("/", (req, res) => {
-  res.json({ status: "UniLearn API running" });
-});
+// Serve React frontend
+app.use(express.static(path.join(__dirname, "dist")));
 
 // Create user
 app.post("/api/signup", async (req, res) => {
@@ -69,6 +72,11 @@ app.post("/api/call/create", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// All other routes serve the React app
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 const PORT = process.env.PORT || 3000;
