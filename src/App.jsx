@@ -2,28 +2,38 @@ import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 
 const LIGHT = {
-  primary:"#1B4332",primaryLight:"#2D6A4F",accent:"#F4A261",accentDark:"#E76F51",
+  primary:"#1B4332",primaryLight:"#2D6A4F",accent:"#F4A261",
   bg:"#F8F9FA",card:"#FFFFFF",text:"#1A1A2E",muted:"#6B7280",border:"#E5E7EB",
   success:"#10B981",warning:"#F59E0B",danger:"#EF4444",info:"#3B82F6",
-  inputBg:"#fff",navBg:"#fff",headerBg:"#1B4332",headerText:"#fff",
+  navBg:"#fff",headerBg:"#1B4332",headerText:"#fff",
 };
 const DARK = {
-  primary:"#52B788",primaryLight:"#74C69D",accent:"#F4A261",accentDark:"#E76F51",
+  primary:"#52B788",primaryLight:"#74C69D",accent:"#F4A261",
   bg:"#0F172A",card:"#1E293B",text:"#F1F5F9",muted:"#94A3B8",border:"#334155",
   success:"#10B981",warning:"#F59E0B",danger:"#EF4444",info:"#3B82F6",
-  inputBg:"#1E293B",navBg:"#1E293B",headerBg:"#0F172A",headerText:"#F1F5F9",
+  navBg:"#1E293B",headerBg:"#0F172A",headerText:"#F1F5F9",
 };
 
-function Login({ onLogin, C }) {
+function Auth({ onLogin, C }) {
+  const [mode, setMode] = useState("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("student");
+  const [matric, setMatric] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const inp = {
+    width:"100%", border:"1.5px solid #E5E7EB", borderRadius:10,
+    padding:"11px 14px", fontSize:14, marginTop:6, boxSizing:"border-box",
+    background:"#fff", color:"#1A1A2E"
+  };
 
   const handleLogin = async () => {
     if (!email || !password) return setError("Please fill in all fields.");
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) { setError(authError.message); setLoading(false); return; }
     const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
@@ -31,7 +41,28 @@ function Login({ onLogin, C }) {
     setLoading(false);
   };
 
-  const inp = { width:"100%", border:"1.5px solid #E5E7EB", borderRadius:10, padding:"11px 14px", fontSize:14, marginTop:6, boxSizing:"border-box" };
+  const handleSignup = async () => {
+    if (!name || !email || !password) return setError("Please fill in all fields.");
+    if (password.length < 6) return setError("Password must be at least 6 characters.");
+    setLoading(true); setError("");
+    const { data, error: authError } = await supabase.auth.signUp({
+      email, password,
+      options: { data: { name, role } }
+    });
+    if (authError) { setError(authError.message); setLoading(false); return; }
+    if (data.user) {
+      await supabase.from("profiles").upsert({
+        id: data.user.id,
+        name, email, role,
+        department: "Computer Science",
+        level: role === "student" ? "300 Level" : null,
+        matric: role === "student" ? matric : null,
+      });
+      setMessage("Account created. You can now sign in.");
+      setMode("login");
+    }
+    setLoading(false);
+  };
 
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(160deg,#1B4332 0%,#2D6A4F 55%,#F4A261 100%)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
@@ -42,18 +73,49 @@ function Login({ onLogin, C }) {
           <div style={{ color:"rgba(255,255,255,0.65)", fontSize:13, marginTop:4 }}>University of Ilorin</div>
         </div>
         <div style={{ background:"#fff", borderRadius:18, padding:26 }}>
-          <div style={{ fontSize:20, fontWeight:"bold", marginBottom:20, color:"#1A1A2E" }}>Welcome Back</div>
+          <div style={{ display:"flex", marginBottom:20, background:"#F8F9FA", borderRadius:10, padding:4 }}>
+            <button onClick={() => { setMode("login"); setError(""); setMessage(""); }} style={{ flex:1, padding:"8px 0", borderRadius:8, border:"none", background:mode==="login"?"#1B4332":"transparent", color:mode==="login"?"#fff":"#6B7280", fontWeight:700, cursor:"pointer", fontSize:13 }}>Sign In</button>
+            <button onClick={() => { setMode("signup"); setError(""); setMessage(""); }} style={{ flex:1, padding:"8px 0", borderRadius:8, border:"none", background:mode==="signup"?"#1B4332":"transparent", color:mode==="signup"?"#fff":"#6B7280", fontWeight:700, cursor:"pointer", fontSize:13 }}>Create Account</button>
+          </div>
           {error && <div style={{ background:"#FEE2E2", color:"#EF4444", padding:"10px 14px", borderRadius:8, marginBottom:14, fontSize:13 }}>{error}</div>}
+          {message && <div style={{ background:"#D1FAE5", color:"#10B981", padding:"10px 14px", borderRadius:8, marginBottom:14, fontSize:13 }}>{message}</div>}
+          {mode === "signup" && (
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:12, fontWeight:700, color:"#6B7280" }}>Full Name</label>
+              <input style={inp} type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Mensah Enoch Kojo" />
+            </div>
+          )}
           <div style={{ marginBottom:14 }}>
             <label style={{ fontSize:12, fontWeight:700, color:"#6B7280" }}>Email Address</label>
-            <input style={inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@unilorin.edu.ng" />
+            <input style={inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@gmail.com" />
           </div>
-          <div style={{ marginBottom:22 }}>
+          <div style={{ marginBottom: mode === "signup" ? 14 : 22 }}>
             <label style={{ fontSize:12, fontWeight:700, color:"#6B7280" }}>Password</label>
             <input style={inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
           </div>
-          <button onClick={handleLogin} disabled={loading} style={{ background:"#1B4332", color:"#fff", border:"none", borderRadius:10, padding:"13px 0", width:"100%", fontSize:15, fontWeight:700, cursor:"pointer" }}>
-            {loading ? "Signing in..." : "Sign In"}
+          {mode === "signup" && (
+            <>
+              <div style={{ marginBottom:14 }}>
+                <label style={{ fontSize:12, fontWeight:700, color:"#6B7280" }}>Role</label>
+                <select style={inp} value={role} onChange={e => setRole(e.target.value)}>
+                  <option value="student">Student</option>
+                  <option value="lecturer">Lecturer</option>
+                </select>
+              </div>
+              {role === "student" && (
+                <div style={{ marginBottom:14 }}>
+                  <label style={{ fontSize:12, fontWeight:700, color:"#6B7280" }}>Matric Number</label>
+                  <input style={inp} type="text" value={matric} onChange={e => setMatric(e.target.value)} placeholder="e.g. 21/52HL089" />
+                </div>
+              )}
+            </>
+          )}
+          <div style={{ marginBottom: mode === "signup" ? 22 : 0 }}></div>
+          <button
+            onClick={mode === "login" ? handleLogin : handleSignup}
+            disabled={loading}
+            style={{ background:"#1B4332", color:"#fff", border:"none", borderRadius:10, padding:"13px 0", width:"100%", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+            {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
           </button>
         </div>
       </div>
@@ -99,7 +161,7 @@ function Dashboard({ user, C }) {
         ))}
       </div>
       <div style={{ fontSize:15, fontWeight:700, marginBottom:10, color:C.text }}>📣 Announcements</div>
-      {announcements.length === 0 && <div style={{ color:C.muted, fontSize:13 }}>No announcements yet.</div>}
+      {announcements.length === 0 && <div style={{ color:C.muted, fontSize:13, padding:"20px 0", textAlign:"center" }}>No announcements yet.</div>}
       {announcements.map(a => (
         <div key={a.id} style={{ background:C.card, borderRadius:12, padding:14, marginBottom:10, border:`1px solid ${C.border}` }}>
           <div style={{ fontWeight:700, fontSize:13, color:C.text }}>{a.title}</div>
@@ -107,6 +169,7 @@ function Dashboard({ user, C }) {
         </div>
       ))}
       <div style={{ fontSize:15, fontWeight:700, margin:"16px 0 10px", color:C.text }}>Your Courses</div>
+      {courses.length === 0 && <div style={{ color:C.muted, fontSize:13, padding:"20px 0", textAlign:"center" }}>No courses added yet.</div>}
       {courses.map(c => (
         <div key={c.id} style={{ background:C.card, borderRadius:12, padding:14, marginBottom:10, border:`1px solid ${C.border}` }}>
           <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{c.code}</div>
@@ -165,7 +228,7 @@ export default function App() {
     </div>
   );
 
-  if (!user) return <Login onLogin={setUser} C={C} />;
+  if (!user) return <Auth onLogin={setUser} C={C} />;
 
   return (
     <div style={{ fontFamily:"'Georgia',serif", background:C.bg, minHeight:"100vh", maxWidth:480, margin:"0 auto", position:"relative" }}>
@@ -178,17 +241,18 @@ export default function App() {
       </div>
       <div style={{ padding:"16px 18px", paddingBottom:90 }}>
         {tab === "home" && <Dashboard user={user} C={C} />}
-        {tab === "courses" && <div style={{ color:C.text, textAlign:"center", paddingTop:40 }}>Courses coming in next update</div>}
-        {tab === "assignments" && <div style={{ color:C.text, textAlign:"center", paddingTop:40 }}>Assignments coming in next update</div>}
+        {tab === "courses" && <div style={{ color:C.text, textAlign:"center", paddingTop:40 }}>Courses coming soon</div>}
+        {tab === "assignments" && <div style={{ color:C.text, textAlign:"center", paddingTop:40 }}>Assignments coming soon</div>}
         {tab === "more" && (
           <div>
             <div style={{ fontSize:18, fontWeight:700, marginBottom:18, color:C.text }}>More</div>
-            <div style={{ background:C.card, borderRadius:12, padding:16, border:`1px solid ${C.border}` }}>
+            <div style={{ background:C.card, borderRadius:12, padding:16, border:`1px solid ${C.border}`, marginBottom:14 }}>
               <div style={{ fontWeight:700, color:C.text }}>{user?.name}</div>
               <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>{user?.email}</div>
               <div style={{ fontSize:12, color:C.muted }}>{user?.role} · {user?.department}</div>
+              {user?.matric && <div style={{ fontSize:12, color:C.muted }}>Matric: {user?.matric}</div>}
             </div>
-            <button onClick={handleLogout} style={{ background:"#FEE2E2", color:"#EF4444", border:"none", borderRadius:12, padding:"14px 0", width:"100%", fontSize:15, fontWeight:700, cursor:"pointer", marginTop:14 }}>Sign Out</button>
+            <button onClick={handleLogout} style={{ background:"#FEE2E2", color:"#EF4444", border:"none", borderRadius:12, padding:"14px 0", width:"100%", fontSize:15, fontWeight:700, cursor:"pointer" }}>Sign Out</button>
           </div>
         )}
       </div>
