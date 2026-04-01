@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "node server.js"
+    "start": "node server.js",
+    "railway": "npm run build && npm start"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
