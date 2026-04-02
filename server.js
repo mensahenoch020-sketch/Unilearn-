@@ -16,12 +16,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Serve React frontend
 app.use(express.static(path.join(__dirname, "dist")));
 
-// Create user
+app.get("/health", (req, res) => {
+  res.json({ status: "UniLearn API running" });
+});
+
 app.post("/api/signup", async (req, res) => {
   const { name, email, password, role, matric, department, level } = req.body;
+  console.log("Signup attempt:", { name, email, role });
   try {
     const { data, error } = await supabase.auth.admin.createUser({
       email,
@@ -29,9 +32,10 @@ app.post("/api/signup", async (req, res) => {
       email_confirm: true,
       user_metadata: { name, role }
     });
+    console.log("Auth response:", JSON.stringify({ data, error }));
     if (error) return res.status(400).json({ error: error.message });
 
-    await supabase.from("profiles").upsert({
+    const { error: profileError } = await supabase.from("profiles").upsert({
       id: data.user.id,
       name,
       email,
@@ -40,14 +44,15 @@ app.post("/api/signup", async (req, res) => {
       level: level || (role === "student" ? "400 Level" : null),
       matric: role === "student" ? matric : null
     });
+    console.log("Profile error:", JSON.stringify(profileError));
 
     res.json({ success: true, userId: data.user.id });
   } catch (err) {
+    console.log("Catch error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Create Daily.co call room
 app.post("/api/call/create", async (req, res) => {
   const { callType } = req.body;
   try {
@@ -74,7 +79,6 @@ app.post("/api/call/create", async (req, res) => {
   }
 });
 
-// All other routes serve the React app
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
