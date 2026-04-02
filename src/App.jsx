@@ -1017,10 +1017,15 @@ export default function App() {
     return ()=>subscription.unsubscribe();
   },[]);
 
-  const handleLogout = async()=>{
-    await supabase.auth.signOut();
-    setUser(null);
-    setTab("home");
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.log(err);
+    } finally {
+      setUser(null);
+      setTab("home");
+    }
   };
 
   const NAV = [
