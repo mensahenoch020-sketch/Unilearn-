@@ -33,7 +33,8 @@ function Auth({ onLogin, C }) {
 
   const handleLogin = async () => {
     if (!email || !password) return setError("Please fill in all fields.");
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) { setError(authError.message); setLoading(false); return; }
     const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
@@ -44,22 +45,32 @@ function Auth({ onLogin, C }) {
   const handleSignup = async () => {
     if (!name || !email || !password) return setError("Please fill in all fields.");
     if (password.length < 6) return setError("Password must be at least 6 characters.");
-    setLoading(true); setError("");
-    const { data, error: authError } = await supabase.auth.signUp({
-      email, password,
-      options: { data: { name, role } }
-    });
-    if (authError) { setError(authError.message); setLoading(false); return; }
-    if (data.user) {
-      await supabase.from("profiles").upsert({
-        id: data.user.id,
-        name, email, role,
-        department: "Computer Science",
-        level: role === "student" ? "300 Level" : null,
-        matric: role === "student" ? matric : null,
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          role,
+          matric,
+          department: "Information Technology",
+          level: "400 Level"
+        })
       });
-      setMessage("Account created. You can now sign in.");
+      const result = await response.json();
+      if (result.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+      setMessage("Account created successfully. You can now sign in.");
       setMode("login");
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
     }
     setLoading(false);
   };
@@ -89,7 +100,7 @@ function Auth({ onLogin, C }) {
             <label style={{ fontSize:12, fontWeight:700, color:"#6B7280" }}>Email Address</label>
             <input style={inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@gmail.com" />
           </div>
-          <div style={{ marginBottom: mode === "signup" ? 14 : 22 }}>
+          <div style={{ marginBottom:14 }}>
             <label style={{ fontSize:12, fontWeight:700, color:"#6B7280" }}>Password</label>
             <input style={inp} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
           </div>
@@ -110,11 +121,11 @@ function Auth({ onLogin, C }) {
               )}
             </>
           )}
-          <div style={{ marginBottom: mode === "signup" ? 22 : 0 }}></div>
+          <div style={{ marginBottom:22 }}></div>
           <button
             onClick={mode === "login" ? handleLogin : handleSignup}
             disabled={loading}
-            style={{ background:"#1B4332", color:"#fff", border:"none", borderRadius:10, padding:"13px 0", width:"100%", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+            style={{ background:"#1B4332", color:"#fff", border:"none", borderRadius:10, padding:"13px 0", width:"100%", fontSize:15, fontWeight:700, cursor:"pointer", opacity:loading?0.7:1 }}>
             {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
           </button>
         </div>
