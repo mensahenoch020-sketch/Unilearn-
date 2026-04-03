@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabase";
 
 const LIGHT = {
@@ -87,7 +87,8 @@ function Auth({onLogin}) {
     setLoading(true); setError("");
     const {data,error:e} = await supabase.auth.signInWithPassword({email,password});
     if(e){setError(e.message);setLoading(false);return;}
-    const {data:profile} = await supabase.from("profiles").select("*").eq("id",data.user.id).single();
+    const {data:profile,error:pe} = await supabase.from("profiles").select("*").eq("id",data.user.id).single();
+    if(pe||!profile){setError("Profile not found. Please contact admin.");setLoading(false);return;}
     onLogin(profile);
     setLoading(false);
   };
@@ -171,7 +172,7 @@ function CallScreen({callType,onClose,C}) {
       } catch{setStatus("error");}
     };
     createRoom();
-  },[]);
+  },[callType]);
 
   useEffect(()=>{
     if(status!=="active") return;
@@ -233,7 +234,7 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
   const [error,setError] = useState("");
   const [showForm,setShowForm] = useState(false);
   const [announcements,setAnnouncements] = useState([]);
-  const [aForm,setAForm] = useState({title:"",description:"",due_date:"",max_score:20});
+  const [aForm,setAForm] = useState({title:"",description:"",due_date:"",max_score:100});
   const [annForm,setAnnForm] = useState({title:"",body:"",priority:"normal"});
   const [qForm,setQForm] = useState({title:"",duration_minutes:15,questions:[]});
   const [newQ,setNewQ] = useState({q:"",options:["","","",""],answer:0});
@@ -276,7 +277,7 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
   const createAssignment = async()=>{
     if(!aForm.title||!aForm.due_date)return setError("Fill in title and due date.");
     await supabase.from("assignments").insert({course_id:selected.id,...aForm,max_score:+aForm.max_score,created_by:user.id});
-    setMessage("Assignment created!");setAForm({title:"",description:"",due_date:"",max_score:20});setShowForm(false);loadData();
+    setMessage("Assignment created!");setAForm({title:"",description:"",due_date:"",max_score:100});setShowForm(false);loadData();
   };
 
   const addQuestion = ()=>{
@@ -429,7 +430,7 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
                 <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:4}}>{s.name}</div>
                 <div style={{fontSize:12,color:C.muted,marginBottom:12}}>Matric: {s.matric}</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:12}}>
-                  {[["CA1",20,"ca1"],["CA2",20,"ca2"],["Mid",30,"midterm"],["Exam",60,"exam"]].map(([l,max,key])=>(
+                  {[["CA1",10,"ca1"],["CA2",10,"ca2"],["Mid",20,"midterm"],["Exam",60,"exam"]].map(([l,max,key])=>(
                     <div key={key}>
                       <div style={{fontSize:10,fontWeight:700,color:C.muted,marginBottom:4}}>{l}/{max}</div>
                       <input type="number" min="0" max={max} value={gf[key]} onChange={e=>setGradeForm({...gradeForm,[s.id]:{...gf,[key]:e.target.value}})}
@@ -686,6 +687,10 @@ function Courses({user,C,onCall}) {
   const [answers,setAnswers] = useState({});
   const [quizResult,setQuizResult] = useState(null);
   const [timeLeft,setTimeLeft] = useState(0);
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
+  const activeQuizRef = useRef(activeQuiz);
+  activeQuizRef.current = activeQuiz;
 
   useEffect(()=>{
     supabase.from("courses").select("*").then(({data})=>{setCourses(data||[]);setLoading(false);});
@@ -696,9 +701,9 @@ function Courses({user,C,onCall}) {
   useEffect(()=>{
     if(!activeQuiz||quizResult) return;
     setTimeLeft(activeQuiz.duration_minutes*60);
-    const t=setInterval(()=>setTimeLeft(p=>{if(p<=1){submitQuiz();clearInterval(t);return 0;}return p-1;}),1000);
+    const t=setInterval(()=>setTimeLeft(p=>{if(p<=1){submitQuizFromTimer();clearInterval(t);return 0;}return p-1;}),1000);
     return ()=>clearInterval(t);
-  },[activeQuiz]);
+  },[activeQuiz,quizResult]);
 
   const loadData = async()=>{
     if(activeTab==="materials"){const {data}=await supabase.from("materials").select("*").eq("course_id",selected.id).order("created_at",{ascending:false});setMaterials(data||[]);}
@@ -721,7 +726,18 @@ function Courses({user,C,onCall}) {
     setMessage("Uploaded successfully!");loadData();setUploading(false);
   };
 
+  const submitQuizFromTimer = async()=>{
+    const quiz = activeQuizRef.current;
+    const ans = answersRef.current;
+    if(!quiz) return;
+    let score=0;
+    quiz.questions.forEach((q,i)=>{if(ans[i]===q.answer)score++;});
+    await supabase.from("quiz_attempts").upsert({quiz_id:quiz.id,student_id:user.id,score,total:quiz.questions.length});
+    setQuizResult({score,total:quiz.questions.length});
+  };
+
   const submitQuiz = async()=>{
+    if(!activeQuiz) return;
     let score=0;
     activeQuiz.questions.forEach((q,i)=>{if(answers[i]===q.answer)score++;});
     await supabase.from("quiz_attempts").upsert({quiz_id:activeQuiz.id,student_id:user.id,score,total:activeQuiz.questions.length});
@@ -1097,7 +1113,7 @@ function Grades({user,C}) {
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:12}}>
-              {[["CA1",g.ca1,20],["CA2",g.ca2,20],["Mid",g.midterm,30],["Exam",g.exam,60]].map(([l,v,max])=>(
+              {[["CA1",g.ca1,10],["CA2",g.ca2,10],["Mid",g.midterm,20],["Exam",g.exam,60]].map(([l,v,max])=>(
                 <div key={l} style={{background:C.bg,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
                   <div style={{fontSize:10,color:C.muted,fontWeight:700}}>{l}/{max}</div>
                   <div style={{fontSize:20,fontWeight:800,color:v!==null?C.text:C.border,marginTop:4}}>{v!==null?v:"—"}</div>
@@ -1308,11 +1324,20 @@ export default function App() {
 
   useEffect(()=>{
     supabase.auth.getSession().then(async({data:{session}})=>{
-      if(session){const {data:profile}=await supabase.from("profiles").select("*").eq("id",session.user.id).single();setUser(profile);}
+      if(session){
+        const {data:profile,error}=await supabase.from("profiles").select("*").eq("id",session.user.id).single();
+        if(profile && !error) setUser(profile);
+        else { console.error("Profile fetch failed:", error); await supabase.auth.signOut(); }
+      }
       setLoading(false);
     });
     const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
-      if(session){const {data:profile}=await supabase.from("profiles").select("*").eq("id",session.user.id).single();setUser(profile);}
+      if(event==="SIGNED_OUT"){setUser(null);return;}
+      if(session){
+        const {data:profile,error}=await supabase.from("profiles").select("*").eq("id",session.user.id).single();
+        if(profile && !error) setUser(profile);
+        else setUser(null);
+      }
       else setUser(null);
     });
     return ()=>subscription.unsubscribe();
