@@ -7,6 +7,14 @@ import { createClient } from "@supabase/supabase-js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const requiredEnv = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+for (const key of requiredEnv) {
+  if (!process.env[key]) {
+    console.error(`Missing required environment variable: ${key}`);
+    process.exit(1);
+  }
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -73,6 +81,9 @@ app.post("/api/call/create", async (req, res) => {
       })
     });
     const room = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json({ error: room.error || "Failed to create room" });
+    }
     res.json({ url: room.url, name: room.name });
   } catch (err) {
     res.status(500).json({ error: err.message });
