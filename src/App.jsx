@@ -54,6 +54,8 @@ const Ic = ({ n, s=20, c="currentColor", w=1.8 }) => {
     micOff:<><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></>,
     phoneOff:<><path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.42 19.42 0 01-3.33-2.67m-2.67-3.34a19.79 19.79 0 01-3.07-8.63A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91"/><line x1="23" y1="1" x2="1" y2="23"/></>,
     plus:<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    search:<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    alert:<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
   };
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round">{icons[n]}</svg>;
 };
@@ -151,7 +153,7 @@ function Auth({onLogin}) {
   );
 }
 
-function CallScreen({callType,onClose,C}) {
+function CallScreen({callType,onClose}) {
   const [status,setStatus] = useState("connecting");
   const [muted,setMuted] = useState(false);
   const [camOff,setCamOff] = useState(false);
@@ -227,6 +229,7 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
   const [quizzes,setQuizzes] = useState([]);
   const [students,setStudents] = useState([]);
   const [grades,setGrades] = useState([]);
+  const [submissions,setSubmissions] = useState([]);
   const [loading,setLoading] = useState(true);
   const [uploading,setUploading] = useState(false);
   const [message,setMessage] = useState("");
@@ -238,6 +241,8 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
   const [qForm,setQForm] = useState({title:"",duration_minutes:15,questions:[]});
   const [newQ,setNewQ] = useState({q:"",options:["","","",""],answer:0});
   const [gradeForm,setGradeForm] = useState({});
+  const [selAssignment,setSelAssignment] = useState(null);
+  const [gradeSubForm,setGradeSubForm] = useState({score:"",feedback:""});
 
   useEffect(()=>{
     supabase.from("courses").select("*").then(({data})=>{setCourses(data||[]);setLoading(false);});
@@ -248,7 +253,10 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
 
   const loadData = async()=>{
     if(activeTab==="materials"){const {data}=await supabase.from("materials").select("*").eq("course_id",selected.id).order("created_at",{ascending:false});setMaterials(data||[]);}
-    if(activeTab==="assignments"){const {data}=await supabase.from("assignments").select("*").eq("course_id",selected.id);setAssignments(data||[]);}
+    if(activeTab==="assignments"){
+      const {data}=await supabase.from("assignments").select("*").eq("course_id",selected.id);
+      setAssignments(data||[]);
+    }
     if(activeTab==="quizzes"){const {data}=await supabase.from("quizzes").select("*").eq("course_id",selected.id);setQuizzes(data||[]);}
     if(activeTab==="grades"){
       const {data:g}=await supabase.from("grades").select("*, profiles(name,matric)").eq("course_id",selected.id);
@@ -256,6 +264,11 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
       const {data:s}=await supabase.from("profiles").select("*").eq("role","student");
       setStudents(s||[]);
     }
+  };
+
+  const loadSubmissions = async(assignmentId)=>{
+    const {data}=await supabase.from("submissions").select("*, profiles(name,matric)").eq("assignment_id",assignmentId);
+    setSubmissions(data||[]);
   };
 
   const handleUpload = async(e)=>{
@@ -297,6 +310,12 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
     setMessage("Grades saved!");
   };
 
+  const gradeSubmission = async(subId,studentId)=>{
+    await supabase.from("submissions").update({score:+gradeSubForm.score,feedback:gradeSubForm.feedback,graded_at:new Date().toISOString(),graded_by:user.id}).eq("id",subId);
+    setMessage("Submission graded!");setGradeSubForm({score:"",feedback:""});
+    loadSubmissions(selAssignment.id);
+  };
+
   const postAnnouncement = async()=>{
     if(!annForm.title||!annForm.body)return setError("Fill in all fields.");
     await supabase.from("announcements").insert({...annForm,author_id:user.id});
@@ -305,23 +324,58 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
   };
 
   const inp={width:"100%",border:`1.5px solid ${C.border}`,borderRadius:12,padding:"12px 16px",fontSize:14,marginTop:6,boxSizing:"border-box",background:C.inputBg,color:C.text,outline:"none",fontFamily:"Inter,sans-serif"};
+  const NAV=[{id:"home",icon:"home",label:"Home"},{id:"courses",icon:"book",label:"Courses"},{id:"announce",icon:"bell",label:"Announce"},{id:"more",icon:"more",label:"More"}];
 
-  const NAV=[
-    {id:"home",icon:"home",label:"Home"},
-    {id:"courses",icon:"book",label:"Courses"},
-    {id:"announce",icon:"bell",label:"Announce"},
-    {id:"more",icon:"more",label:"More"},
-  ];
+  if(selAssignment) return (
+    <div style={{fontFamily:"Inter,sans-serif",background:C.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
+      <div style={{background:C.headerBg,color:C.headerText,padding:"14px 20px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:100}}>
+        <button onClick={()=>{setSelAssignment(null);setSubmissions([]);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,display:"flex"}}><Ic n="chevronL" s={22} c={C.headerText}/></button>
+        <div style={{flex:1,fontWeight:800,fontSize:16}}>Submissions</div>
+      </div>
+      <div style={{padding:20}}>
+        <div style={{background:C.card,borderRadius:16,padding:16,marginBottom:20,border:`1px solid ${C.border}`}}>
+          <div style={{fontWeight:700,fontSize:15,color:C.text}}>{selAssignment.title}</div>
+          <div style={{fontSize:12,color:C.muted,marginTop:4}}>{submissions.length} submission{submissions.length!==1?"s":""} · {selAssignment.max_score} marks</div>
+        </div>
+        {message&&<div style={{background:"#D1FAE5",color:"#10B981",padding:"12px 16px",borderRadius:12,marginBottom:16,fontSize:13}}>{message}</div>}
+        {submissions.length===0?<div style={{textAlign:"center",color:C.muted,padding:"40px 0",fontSize:14}}>No submissions yet.</div>:
+        submissions.map(s=>(
+          <div key={s.id} style={{background:C.card,borderRadius:16,padding:16,marginBottom:12,border:`1px solid ${C.border}`}}>
+            <div style={{fontWeight:700,fontSize:14,color:C.text}}>{s.profiles?.name}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>Matric: {s.profiles?.matric}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>Submitted: {new Date(s.submitted_at).toLocaleDateString()}</div>
+            {s.file_path&&<a href={s.file_path} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,background:C.primary+"18",color:C.primary,borderRadius:10,padding:"8px 14px",fontSize:12,fontWeight:700,textDecoration:"none",marginTop:8}}>
+              <Ic n="file" s={14} c={C.primary}/>View Submission
+            </a>}
+            {s.score!==null?
+              <div style={{marginTop:10,background:"#D1FAE5",borderRadius:10,padding:"10px 14px"}}>
+                <div style={{fontWeight:700,color:"#10B981",fontSize:14}}>Graded: {s.score}/{selAssignment.max_score}</div>
+                {s.feedback&&<div style={{fontSize:12,color:"#065F46",marginTop:4}}>{s.feedback}</div>}
+              </div>:
+              <div style={{marginTop:10}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <div><label style={{fontSize:11,fontWeight:600,color:C.muted}}>Score (/{selAssignment.max_score})</label>
+                    <input type="number" min="0" max={selAssignment.max_score} value={gradeSubForm.score} onChange={e=>setGradeSubForm({...gradeSubForm,score:e.target.value})}
+                      style={{...inp,marginTop:4}}/></div>
+                  <div><label style={{fontSize:11,fontWeight:600,color:C.muted}}>Feedback</label>
+                    <input value={gradeSubForm.feedback} onChange={e=>setGradeSubForm({...gradeSubForm,feedback:e.target.value})}
+                      style={{...inp,marginTop:4}} placeholder="Optional feedback"/></div>
+                </div>
+                <button onClick={()=>gradeSubmission(s.id,s.student_id)} style={{background:C.success,color:"#fff",border:"none",borderRadius:10,padding:"10px 0",width:"100%",fontSize:13,fontWeight:700,cursor:"pointer"}}>Grade Submission</button>
+              </div>
+            }
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   if(selected) return (
     <div style={{fontFamily:"Inter,sans-serif",background:C.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{background:C.headerBg,color:C.headerText,padding:"14px 20px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:100}}>
         <button onClick={()=>{setSelected(null);setMessage("");setError("");setShowForm(false);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,display:"flex"}}><Ic n="chevronL" s={22} c={C.headerText}/></button>
-        <div style={{flex:1}}>
-          <div style={{fontWeight:800,fontSize:16}}>{selected.code}</div>
-          <div style={{fontSize:11,opacity:0.7}}>{selected.title}</div>
-        </div>
+        <div style={{flex:1}}><div style={{fontWeight:800,fontSize:16}}>{selected.code}</div><div style={{fontSize:11,opacity:0.7}}>{selected.title}</div></div>
         <button onClick={()=>setDark(!dark)} style={{background:"none",border:"none",cursor:"pointer",padding:4,display:"flex"}}><Ic n={dark?"sun":"moon"} s={20} c={C.headerText}/></button>
       </div>
       <div style={{padding:"20px",paddingBottom:40}}>
@@ -375,10 +429,13 @@ function LecturerApp({user,setUser,dark,setDark,C,onCall,onLogout}) {
               <div key={a.id} style={{background:C.card,borderRadius:16,padding:16,marginBottom:12,border:`1px solid ${C.border}`,borderLeft:`4px solid ${days<0?"#EF4444":days<3?"#F59E0B":"#10B981"}`}}>
                 <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:6}}>{a.title}</div>
                 <div style={{fontSize:13,color:C.muted,lineHeight:1.6,marginBottom:10}}>{a.description}</div>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
                   <Badge text={`Due: ${a.due_date}`} bg={C.bg} color={C.muted}/>
                   <Badge text={`${a.max_score} marks`} bg="#EFF6FF" color="#3B82F6"/>
                 </div>
+                <button onClick={async()=>{setSelAssignment(a);await loadSubmissions(a.id);}} style={{background:C.primary+"18",color:C.primary,border:"none",borderRadius:10,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                  <Ic n="users" s={14} c={C.primary}/>View Submissions
+                </button>
               </div>
             );
           })}
@@ -582,12 +639,12 @@ function CourseDiscussion({course,user,C,onCall}) {
   useEffect(()=>{loadPosts();},[]);
 
   const loadPosts = async()=>{
-    const {data} = await supabase.from("forum_posts").select("*, profiles(name,role)").eq("course_id",course.id).is("parent_id",null).order("created_at",{ascending:false});
+    const {data}=await supabase.from("forum_posts").select("*, profiles(name,role)").eq("course_id",course.id).is("parent_id",null).order("created_at",{ascending:false});
     setPosts(data||[]);setLoading(false);
   };
 
   const loadReplies = async(postId)=>{
-    const {data} = await supabase.from("forum_posts").select("*, profiles(name,role)").eq("parent_id",postId).order("created_at",{ascending:true});
+    const {data}=await supabase.from("forum_posts").select("*, profiles(name,role)").eq("parent_id",postId).order("created_at",{ascending:true});
     setReplyPosts(prev=>({...prev,[postId]:data||[]}));
   };
 
@@ -625,7 +682,7 @@ function CourseDiscussion({course,user,C,onCall}) {
           style={{width:"100%",border:"none",background:"transparent",fontSize:14,color:C.text,resize:"none",outline:"none",height:80,fontFamily:"Inter,sans-serif",lineHeight:1.6}}/>
         <div style={{display:"flex",justifyContent:"flex-end"}}>
           <button onClick={postMessage} style={{background:"#1B4332",color:"#fff",border:"none",borderRadius:10,padding:"8px 20px",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-            <Ic n="send" s={14} c="#fff"/> Post
+            <Ic n="send" s={14} c="#fff"/>Post
           </button>
         </div>
       </div>
@@ -674,11 +731,14 @@ function CourseDiscussion({course,user,C,onCall}) {
 
 function Courses({user,C,onCall}) {
   const [courses,setCourses] = useState([]);
+  const [filtered,setFiltered] = useState([]);
+  const [search,setSearch] = useState("");
   const [selected,setSelected] = useState(null);
   const [activeTab,setActiveTab] = useState("materials");
   const [materials,setMaterials] = useState([]);
   const [assignments,setAssignments] = useState([]);
   const [quizzes,setQuizzes] = useState([]);
+  const [attempts,setAttempts] = useState([]);
   const [loading,setLoading] = useState(true);
   const [uploading,setUploading] = useState(false);
   const [message,setMessage] = useState("");
@@ -686,10 +746,20 @@ function Courses({user,C,onCall}) {
   const [answers,setAnswers] = useState({});
   const [quizResult,setQuizResult] = useState(null);
   const [timeLeft,setTimeLeft] = useState(0);
+  const [selAssignment,setSelAssignment] = useState(null);
+  const [subFile,setSubFile] = useState(null);
+  const [submitting,setSubmitting] = useState(false);
+  const [mySubmissions,setMySubmissions] = useState({});
+  const fRef = useRef();
 
   useEffect(()=>{
-    supabase.from("courses").select("*").then(({data})=>{setCourses(data||[]);setLoading(false);});
+    supabase.from("courses").select("*").then(({data})=>{setCourses(data||[]);setFiltered(data||[]);setLoading(false);});
   },[]);
+
+  useEffect(()=>{
+    if(!search.trim()){setFiltered(courses);return;}
+    setFiltered(courses.filter(c=>c.code.toLowerCase().includes(search.toLowerCase())||c.title.toLowerCase().includes(search.toLowerCase())));
+  },[search,courses]);
 
   useEffect(()=>{if(selected) loadData();},[selected,activeTab]);
 
@@ -702,8 +772,17 @@ function Courses({user,C,onCall}) {
 
   const loadData = async()=>{
     if(activeTab==="materials"){const {data}=await supabase.from("materials").select("*").eq("course_id",selected.id).order("created_at",{ascending:false});setMaterials(data||[]);}
-    if(activeTab==="assignments"){const {data}=await supabase.from("assignments").select("*").eq("course_id",selected.id).order("due_date");setAssignments(data||[]);}
-    if(activeTab==="quizzes"){const {data}=await supabase.from("quizzes").select("*").eq("course_id",selected.id);setQuizzes(data||[]);}
+    if(activeTab==="assignments"){
+      const {data:a}=await supabase.from("assignments").select("*").eq("course_id",selected.id).order("due_date");
+      setAssignments(a||[]);
+      const ids=(a||[]).map(x=>x.id);
+      if(ids.length>0){const {data:s}=await supabase.from("submissions").select("*").eq("student_id",user.id).in("assignment_id",ids);
+      const map={};(s||[]).forEach(x=>{map[x.assignment_id]=x;});setMySubmissions(map);}
+    }
+    if(activeTab==="quizzes"){
+      const {data:q}=await supabase.from("quizzes").select("*").eq("course_id",selected.id);setQuizzes(q||[]);
+      const {data:att}=await supabase.from("quiz_attempts").select("*").eq("student_id",user.id);setAttempts(att||[]);
+    }
   };
 
   const handleUpload = async(e)=>{
@@ -721,6 +800,18 @@ function Courses({user,C,onCall}) {
     setMessage("Uploaded successfully!");loadData();setUploading(false);
   };
 
+  const submitAssignment = async()=>{
+    if(!subFile) return;
+    setSubmitting(true);
+    const filePath=`submissions/${selAssignment.id}/${user.id}_${Date.now()}_${subFile.name}`;
+    const {error:ue}=await supabase.storage.from("unilearn").upload(filePath,subFile);
+    if(ue){setMessage("Upload failed: "+ue.message);setSubmitting(false);return;}
+    const {data:urlData}=supabase.storage.from("unilearn").getPublicUrl(filePath);
+    await supabase.from("submissions").upsert({assignment_id:selAssignment.id,student_id:user.id,file_path:urlData.publicUrl,file_name:subFile.name});
+    setMessage("Assignment submitted successfully!");setSubFile(null);setSelAssignment(null);
+    loadData();setSubmitting(false);
+  };
+
   const submitQuiz = async()=>{
     let score=0;
     activeQuiz.questions.forEach((q,i)=>{if(answers[i]===q.answer)score++;});
@@ -729,6 +820,58 @@ function Courses({user,C,onCall}) {
   };
 
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+
+  if(selAssignment) return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <button onClick={()=>{setSelAssignment(null);setSubFile(null);}} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Ic n="chevronL" s={22} c={C.text}/></button>
+        <div style={{flex:1}}><div style={{fontWeight:800,fontSize:16,color:C.text}}>{selAssignment.title}</div></div>
+      </div>
+      {message&&<div style={{background:"#D1FAE5",color:"#10B981",padding:"12px 16px",borderRadius:12,marginBottom:16,fontSize:13}}>{message}</div>}
+      <div style={{background:C.card,borderRadius:16,padding:16,marginBottom:16,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:13,color:C.text,lineHeight:1.7,marginBottom:12}}>{selAssignment.description}</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <Badge text={`Due: ${selAssignment.due_date}`} bg={C.bg} color={C.muted}/>
+          <Badge text={`${selAssignment.max_score} marks`} bg="#EFF6FF" color="#3B82F6"/>
+        </div>
+      </div>
+      {mySubmissions[selAssignment.id]?(
+        <div style={{background:"#D1FAE5",borderRadius:16,padding:20,border:"1px solid #A7F3D0"}}>
+          <div style={{fontWeight:700,fontSize:15,color:"#065F46",marginBottom:8}}>✓ Submitted</div>
+          <div style={{fontSize:13,color:"#065F46"}}>File: {mySubmissions[selAssignment.id].file_name}</div>
+          {mySubmissions[selAssignment.id].score!==null&&<div style={{marginTop:12,background:"#fff",borderRadius:10,padding:12}}>
+            <div style={{fontWeight:700,color:"#10B981",fontSize:16}}>Score: {mySubmissions[selAssignment.id].score}/{selAssignment.max_score}</div>
+            {mySubmissions[selAssignment.id].feedback&&<div style={{fontSize:13,color:"#6B6B6B",marginTop:4}}>{mySubmissions[selAssignment.id].feedback}</div>}
+          </div>}
+          {mySubmissions[selAssignment.id].score===null&&<div style={{fontSize:12,color:"#065F46",marginTop:8}}>Awaiting grade from lecturer.</div>}
+        </div>
+      ):(
+        <div style={{background:C.card,borderRadius:16,padding:20,border:`1px solid ${C.border}`}}>
+          <div style={{fontWeight:700,fontSize:15,color:C.text,marginBottom:16}}>Submit Assignment</div>
+          <input ref={fRef} type="file" style={{display:"none"}} onChange={e=>setSubFile(e.target.files[0])} accept=".pdf,.doc,.docx,.zip"/>
+          {subFile?(
+            <div style={{background:C.bg,borderRadius:12,padding:12,marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
+              <Ic n="file" s={22} c={C.primary}/>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:13,color:C.text}}>{subFile.name}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:2}}>{(subFile.size/1024/1024).toFixed(1)} MB</div>
+              </div>
+              <button onClick={()=>setSubFile(null)} style={{background:"none",border:"none",cursor:"pointer"}}><Ic n="x" s={16} c={C.muted}/></button>
+            </div>
+          ):(
+            <button onClick={()=>fRef.current.click()} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,width:"100%",background:C.bg,border:`2px dashed ${C.border}`,borderRadius:14,padding:"32px 0",cursor:"pointer",marginBottom:16}}>
+              <Ic n="upload" s={28} c={C.muted}/>
+              <div style={{fontSize:13,fontWeight:600,color:C.muted}}>Tap to choose file</div>
+              <div style={{fontSize:11,color:C.muted}}>PDF, DOC, ZIP accepted</div>
+            </button>
+          )}
+          <button onClick={submitAssignment} disabled={!subFile||submitting} style={{background:subFile?C.primary:C.muted,color:"#fff",border:"none",borderRadius:12,padding:"14px 0",width:"100%",fontSize:14,fontWeight:700,cursor:"pointer",opacity:submitting?0.7:1}}>
+            {submitting?"Submitting...":subFile?"Submit Assignment":"Choose a File First"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   if(activeQuiz&&!quizResult) return (
     <div>
@@ -831,14 +974,17 @@ function Courses({user,C,onCall}) {
         assignments.map(a=>{
           const days=Math.ceil((new Date(a.due_date)-new Date())/86400000);
           const overdue=days<0;
+          const mySub=mySubmissions[a.id];
           return(
-            <div key={a.id} style={{background:C.card,borderRadius:16,padding:16,marginBottom:12,border:`1px solid ${C.border}`,borderLeft:`4px solid ${overdue?"#EF4444":days<3?"#F59E0B":"#10B981"}`}}>
+            <div key={a.id} onClick={()=>setSelAssignment(a)} style={{background:C.card,borderRadius:16,padding:16,marginBottom:12,border:`1px solid ${C.border}`,borderLeft:`4px solid ${mySub?"#10B981":overdue?"#EF4444":days<3?"#F59E0B":"#10B981"}`,cursor:"pointer"}}>
               <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:8}}>{a.title}</div>
-              <div style={{fontSize:13,color:C.muted,lineHeight:1.6,marginBottom:12}}>{a.description}</div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <Badge text={overdue?"Overdue":`${days}d left`} bg={overdue?"#FEE2E2":days<3?"#FEF3C7":"#D1FAE5"} color={overdue?"#EF4444":days<3?"#F59E0B":"#10B981"}/>
-                <Badge text={`Due: ${a.due_date}`} bg={C.bg} color={C.muted}/>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                {mySub?<Badge text={mySub.score!==null?`Graded: ${mySub.score}/${a.max_score}`:"Submitted"} bg={mySub.score!==null?"#D1FAE5":"#EFF6FF"} color={mySub.score!==null?"#10B981":"#3B82F6"}/>:
+                <Badge text={overdue?"Overdue":`${days}d left`} bg={overdue?"#FEE2E2":days<3?"#FEF3C7":"#D1FAE5"} color={overdue?"#EF4444":days<3?"#F59E0B":"#10B981"}/>}
                 <Badge text={`${a.max_score} marks`} bg="#EFF6FF" color="#3B82F6"/>
+                <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4,color:C.muted,fontSize:12}}>
+                  <span>{mySub?"View":"Submit"}</span><Ic n="chevronR" s={14} c={C.muted}/>
+                </div>
               </div>
             </div>
           );
@@ -847,21 +993,33 @@ function Courses({user,C,onCall}) {
 
       {activeTab==="quizzes"&&<div>
         {quizzes.length===0?<div style={{textAlign:"center",color:C.muted,padding:"40px 0",fontSize:14}}>No quizzes yet.</div>:
-        quizzes.map(q=>(
-          <div key={q.id} style={{background:C.card,borderRadius:16,padding:16,marginBottom:10,border:`1px solid ${C.border}`}}>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:44,height:44,background:"#8B5CF618",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <Ic n="chart" s={20} c="#8B5CF6"/>
+        quizzes.map(q=>{
+          const attempt=attempts.find(a=>a.quiz_id===q.id);
+          const pct=attempt?Math.round((attempt.score/attempt.total)*100):null;
+          const g=pct!==null?gradeOf(pct):null;
+          return(
+            <div key={q.id} style={{background:C.card,borderRadius:16,padding:16,marginBottom:10,border:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:44,height:44,background:"#8B5CF618",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <Ic n="chart" s={20} c="#8B5CF6"/>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14,color:C.text}}>{q.title}</div>
+                  <div style={{fontSize:12,color:C.muted,marginTop:4}}>{q.questions?.length||0} questions · {q.duration_minutes} mins</div>
+                  {attempt&&<div style={{marginTop:6,display:"flex",alignItems:"center",gap:6}}>
+                    <Badge text={`${attempt.score}/${attempt.total} · ${pct}%`} bg={g.color+"20"} color={g.color}/>
+                    <Badge text={`Grade ${g.letter}`} bg={g.color+"20"} color={g.color}/>
+                  </div>}
+                </div>
+                {attempt?
+                  <Badge text="Completed" bg="#D1FAE5" color="#10B981"/>:
+                  <button onClick={()=>{setActiveQuiz(q);setAnswers({});setQuizResult(null);}}
+                    style={{background:C.primary,color:"#fff",border:"none",borderRadius:10,padding:"8px 16px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>Start</button>
+                }
               </div>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:14,color:C.text}}>{q.title}</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:4}}>{q.questions?.length||0} questions · {q.duration_minutes} mins</div>
-              </div>
-              <button onClick={()=>{setActiveQuiz(q);setAnswers({});setQuizResult(null);}}
-                style={{background:C.primary,color:"#fff",border:"none",borderRadius:10,padding:"8px 16px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>Start</button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>}
 
       {activeTab==="discussion"&&<CourseDiscussion course={selected} user={user} C={C} onCall={onCall}/>}
@@ -870,8 +1028,15 @@ function Courses({user,C,onCall}) {
 
   return (
     <div>
-      <div style={{fontSize:22,fontWeight:800,marginBottom:20,color:C.text,letterSpacing:-0.5}}>My Courses</div>
-      {courses.map((c,i)=>(
+      <div style={{fontSize:22,fontWeight:800,marginBottom:16,color:C.text,letterSpacing:-0.5}}>My Courses</div>
+      <div style={{display:"flex",alignItems:"center",gap:10,background:C.card,borderRadius:14,padding:"10px 16px",marginBottom:20,border:`1px solid ${C.border}`}}>
+        <Ic n="search" s={18} c={C.muted}/>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search courses..."
+          style={{flex:1,border:"none",background:"transparent",fontSize:14,color:C.text,outline:"none",fontFamily:"Inter,sans-serif"}}/>
+        {search&&<button onClick={()=>setSearch("")} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><Ic n="x" s={16} c={C.muted}/></button>}
+      </div>
+      {filtered.length===0?<div style={{textAlign:"center",color:C.muted,padding:"40px 0",fontSize:14}}>No courses found.</div>:
+      filtered.map((c,i)=>(
         <div key={c.id} onClick={()=>setSelected(c)}
           style={{background:C.card,borderRadius:16,padding:16,marginBottom:10,border:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:14,cursor:"pointer",animation:`fadeIn 0.4s ease ${i*0.05}s both`}}>
           <div style={{width:48,height:48,background:c.color+"18",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -896,6 +1061,7 @@ function Dashboard({user,C,setTab}) {
   const [courses,setCourses] = useState([]);
   const [loading,setLoading] = useState(true);
   const [greeting,setGreeting] = useState("");
+  const [upcomingDeadlines,setUpcomingDeadlines] = useState([]);
 
   useEffect(()=>{
     const h=new Date().getHours();
@@ -903,7 +1069,15 @@ function Dashboard({user,C,setTab}) {
     const load=async()=>{
       const {data:ann}=await supabase.from("announcements").select("*").order("created_at",{ascending:false}).limit(5);
       const {data:crs}=await supabase.from("courses").select("*");
-      setAnnouncements(ann||[]);setCourses(crs||[]);setLoading(false);
+      const {data:asgn}=await supabase.from("assignments").select("*, courses(code,color)").order("due_date");
+      setAnnouncements(ann||[]);
+      setCourses(crs||[]);
+      const upcoming=(asgn||[]).filter(a=>{
+        const days=Math.ceil((new Date(a.due_date)-new Date())/86400000);
+        return days>=0&&days<=7;
+      });
+      setUpcomingDeadlines(upcoming);
+      setLoading(false);
     };
     load();
   },[]);
@@ -924,6 +1098,7 @@ function Dashboard({user,C,setTab}) {
           <div style={{background:"rgba(255,255,255,0.15)",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:600}}>Harmattan Semester</div>
         </div>
       </div>
+
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:24}}>
         {[
           {l:"Courses",v:courses.length,color:"#3B82F6",bg:"#EFF6FF",icon:"book",tab:"courses"},
@@ -940,8 +1115,28 @@ function Dashboard({user,C,setTab}) {
           </div>
         ))}
       </div>
+
+      {upcomingDeadlines.length>0&&<>
+        <div style={{fontSize:12,fontWeight:700,marginBottom:12,color:C.muted,letterSpacing:0.8}}>⏰ UPCOMING DEADLINES</div>
+        {upcomingDeadlines.map(a=>{
+          const days=Math.ceil((new Date(a.due_date)-new Date())/86400000);
+          return(
+            <div key={a.id} onClick={()=>setTab("courses")} style={{background:C.card,borderRadius:14,padding:14,marginBottom:8,border:`1px solid ${C.border}`,borderLeft:`4px solid ${days<=2?"#EF4444":"#F59E0B"}`,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+              <div style={{width:36,height:36,background:(a.courses?.color||"#999")+"18",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Ic n="clip" s={16} c={a.courses?.color||"#999"}/>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:13,color:C.text}}>{a.title}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:2}}>{a.courses?.code} · Due {a.due_date}</div>
+              </div>
+              <Badge text={days===0?"Today":`${days}d`} bg={days<=2?"#FEE2E2":"#FEF3C7"} color={days<=2?"#EF4444":"#F59E0B"}/>
+            </div>
+          );
+        })}
+      </>}
+
       {announcements.length>0&&<>
-        <div style={{fontSize:12,fontWeight:700,marginBottom:12,color:C.muted,letterSpacing:0.8}}>ANNOUNCEMENTS</div>
+        <div style={{fontSize:12,fontWeight:700,marginBottom:12,color:C.muted,letterSpacing:0.8,marginTop:20}}>ANNOUNCEMENTS</div>
         {announcements.map((a,i)=>(
           <div key={a.id} style={{background:C.card,borderRadius:16,padding:16,marginBottom:10,border:`1px solid ${C.border}`,borderLeft:`4px solid ${a.priority==="high"?"#EF4444":"#F59E0B"}`,animation:`fadeIn 0.4s ease ${i*0.1}s both`}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
@@ -952,6 +1147,7 @@ function Dashboard({user,C,setTab}) {
           </div>
         ))}
       </>}
+
       <div style={{fontSize:12,fontWeight:700,marginBottom:12,color:C.muted,letterSpacing:0.8,marginTop:24}}>YOUR COURSES</div>
       {courses.map((c,i)=>(
         <div key={c.id} onClick={()=>setTab("courses")} style={{background:C.card,borderRadius:16,padding:16,marginBottom:10,border:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:14,cursor:"pointer",animation:`fadeIn 0.4s ease ${i*0.05}s both`}}>
@@ -1319,14 +1515,9 @@ export default function App() {
   },[]);
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch(err) {
-      console.log(err);
-    } finally {
-      setUser(null);
-      setTab("home");
-    }
+    try { await supabase.auth.signOut(); }
+    catch(err){ console.log(err); }
+    finally { setUser(null); setTab("home"); }
   };
 
   const NAV=[
@@ -1353,7 +1544,7 @@ export default function App() {
   );
 
   if(!user) return <Auth onLogin={setUser}/>;
-  if(callType) return <CallScreen callType={callType} onClose={()=>setCallType(null)} C={C}/>;
+  if(callType) return <CallScreen callType={callType} onClose={()=>setCallType(null)}/>;
   if(user?.role==="lecturer") return <LecturerApp user={user} setUser={setUser} dark={dark} setDark={setDark} C={C} onCall={setCallType} onLogout={handleLogout}/>;
 
   return (
