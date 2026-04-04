@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
-const LIGHT = {
+import { FACULTIES, LEVELS, SEMESTERS } from "./data";
 primary:"#1B4332",primaryLight:"#2D6A4F",accent:"#F4A261",
 bg:"#F5F5F7",card:"#FFFFFF",text:"#1A1A1A",muted:"#6B6B6B",border:"#E8E8E8",
 success:"#10B981",warning:"#F59E0B",danger:"#EF4444",info:"#3B82F6",
