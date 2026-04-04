@@ -1,0 +1,22 @@
+{
+  "name": "UniLearn",
+  "short_name": "UniLearn",
+  "description": "University of Ilorin Learning Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1B4332",
+  "theme_color": "#1B4332",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/1B4332/F4A261?text=UL",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/1B4332/F4A261?text=UL",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
