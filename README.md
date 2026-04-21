@@ -1,2 +1,0 @@
-# Unilearn-
-University learning app
