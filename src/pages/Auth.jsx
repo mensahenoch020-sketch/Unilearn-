@@ -67,7 +67,9 @@ export default function Auth({ onLogin }) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/signup`, {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      if (!apiUrl) { setError("Server not configured. Please contact support."); setLoading(false); return; }
+      const res = await fetch(`${apiUrl}/api/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -83,12 +85,18 @@ export default function Auth({ onLogin }) {
           semester: role === "student" ? semester : null,
         }),
       });
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({}));
+        setError(result.error || "Server error. Please try again.");
+        setLoading(false);
+        return;
+      }
       const result = await res.json();
       if (result.error) { setError(result.error); setLoading(false); return; }
       setMessage("Account created successfully! You can now sign in.");
       switchMode("login");
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError("Something went wrong. Please check your connection and try again.");
     }
     setLoading(false);
   };

@@ -182,6 +182,10 @@ export default function App() {
     );
   }
 
+  if (user.role !== "student") {
+    return <UnknownRole onLogout={handleLogout} />;
+  }
+
   if (showEnrollment) {
     return <CourseEnrollment user={user} onDone={() => setShowEnrollment(false)} />;
   }
@@ -197,5 +201,47 @@ export default function App() {
         onLogout={handleLogout}
       />
     </BrowserRouter>
+  );
+}
+
+// Unreachable in normal usage but prevents undefined render for unknown roles
+function UnknownRole({ onLogout }) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "Inter,sans-serif",
+        background: "#F5F5F7",
+        padding: 24,
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontSize: 40, marginBottom: 16 }}>⚠️</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A", marginBottom: 8 }}>
+        Unknown Account Role
+      </div>
+      <div style={{ fontSize: 14, color: "#6B6B6B", marginBottom: 24 }}>
+        Your account has an unrecognised role. Please contact support.
+      </div>
+      <button
+        onClick={onLogout}
+        style={{
+          background: "#1B4332",
+          color: "#fff",
+          border: "none",
+          borderRadius: 12,
+          padding: "14px 28px",
+          fontWeight: 700,
+          cursor: "pointer",
+          fontFamily: "Inter,sans-serif",
+        }}
+      >
+        Sign Out
+      </button>
+    </div>
   );
 }

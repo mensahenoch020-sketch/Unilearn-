@@ -48,7 +48,7 @@ export default function More({ user, dark, setDark, onLogout, C }) {
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 800, fontSize: 16, color: C.text }}>{user?.name}</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{user?.email}</div>
-          <div style={{ fontSize: 12, color: C.muted }}>{user?.department} · {user?.level}</div>
+          <div style={{ fontSize: 12, color: C.muted }}>{user?.department || ""}{user?.department && user?.level ? " · " : ""}{user?.level || ""}</div>
           {user?.matric && <div style={{ fontSize: 12, color: C.muted }}>Matric: {user?.matric}</div>}
         </div>
       </div>

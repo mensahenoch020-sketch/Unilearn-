@@ -10,6 +10,14 @@ import CourseDiscussion from "../../components/CourseDiscussion.jsx";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
+function Card({ children, style = {}, C }) {
+  return (
+    <div style={{ background: C.card, borderRadius: 16, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }}>
+      {children}
+    </div>
+  );
+}
+
 export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout }) {
   const [tab, setTab] = useState("home");
   const [courses, setCourses] = useState([]);
@@ -109,6 +117,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     const { error: ue } = await supabase.storage.from("unilearn").upload(filePath, file);
     if (ue) { setError("Upload failed: " + ue.message); setUploading(false); return; }
     const { data: urlData } = supabase.storage.from("unilearn").getPublicUrl(filePath);
+    if (!urlData?.publicUrl) { setError("Failed to get file URL. Please try again."); setUploading(false); return; }
     const type = file.name.match(/\.pdf$/i) ? "PDF" : file.name.match(/\.(mp4|mov)$/i) ? "Video" : "Document";
     await supabase.from("materials").insert({ course_id: selected.id, title: file.name, type, file_path: urlData.publicUrl, file_size: `${(file.size / 1024 / 1024).toFixed(1)} MB`, uploaded_by: user.id });
     setMessage("Uploaded!"); loadData(); setUploading(false);
@@ -169,12 +178,6 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     { id: "more", icon: "more", label: "More" },
   ];
 
-  const Card = ({ children, style = {} }) => (
-    <div style={{ background: C.card, borderRadius: 16, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }}>
-      {children}
-    </div>
-  );
-
   // ── SUBMISSION REVIEW ──────────────────────────────────
   if (selAssignment) return (
     <div style={{ fontFamily: "Inter,sans-serif", background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto" }}>
@@ -185,13 +188,13 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
       <div style={{ padding: 20 }}>
         {message && <div style={{ background: "#D1FAE5", color: "#10B981", padding: "12px 16px", borderRadius: 12, marginBottom: 16, fontSize: 13 }}>✓ {message}</div>}
         {error && <div style={{ background: "#FEE2E2", color: "#EF4444", padding: "12px 16px", borderRadius: 12, marginBottom: 16, fontSize: 13 }}>{error}</div>}
-        <Card style={{ padding: 14, marginBottom: 16 }}>
+        <Card C={C} style={{ padding: 14, marginBottom: 16 }}>
           <div style={{ fontWeight: 700, color: C.text }}>{submissions.length} submission{submissions.length !== 1 ? "s" : ""}</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Max: {selAssignment.max_score} marks</div>
         </Card>
         {submissions.length === 0 && <div style={{ textAlign: "center", color: C.muted, padding: "40px 0" }}>No submissions yet.</div>}
         {submissions.map((s) => (
-          <Card key={s.id} style={{ padding: 16, marginBottom: 12 }}>
+          <Card C={C} key={s.id} style={{ padding: 16, marginBottom: 12 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{s.profiles?.name}</div>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Matric: {s.profiles?.matric}</div>
             {s.file_path && <a href={s.file_path} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.bg, color: C.primary, borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, textDecoration: "none", marginTop: 8 }}><Ic n="file" s={14} c={C.primary} />View File</a>}
@@ -244,7 +247,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             </label>
             {materials.length === 0 && <div style={{ textAlign: "center", color: C.muted, padding: "40px 0" }}>No materials yet.</div>}
             {materials.map((m) => (
-              <Card key={m.id} style={{ padding: 16, marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
+              <Card C={C} key={m.id} style={{ padding: 16, marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 44, height: 44, background: m.type === "PDF" ? "#EF444415" : "#3B82F615", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}><Ic n="file" s={20} c={m.type === "PDF" ? "#EF4444" : "#3B82F6"} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</div>
@@ -261,7 +264,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             <button onClick={() => setShowForm(!showForm)} style={{ display: "flex", alignItems: "center", gap: 8, background: C.success, color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", marginBottom: 16, fontFamily: "Inter,sans-serif" }}>
               <Ic n="plus" s={18} c="#fff" />{showForm ? "Cancel" : "Create Assignment"}
             </button>
-            {showForm && <Card style={{ padding: 20, marginBottom: 20 }}>
+            {showForm && <Card C={C} style={{ padding: 20, marginBottom: 20 }}>
               <div style={{ marginBottom: 12 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.muted, display: "block", marginBottom: 6 }}>Title *</label><input style={inp} value={aForm.title} onChange={(e) => setAForm({ ...aForm, title: e.target.value })} placeholder="Assignment title" /></div>
               <div style={{ marginBottom: 12 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.muted, display: "block", marginBottom: 6 }}>Description</label><textarea style={{ ...inp, minHeight: 80, resize: "none" }} value={aForm.description} onChange={(e) => setAForm({ ...aForm, description: e.target.value })} placeholder="Instructions..." /></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
@@ -272,7 +275,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             </Card>}
             {assignments.map((a) => {
               const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
-              return <Card key={a.id} style={{ padding: 16, marginBottom: 10 }}>
+              return <Card C={C} key={a.id} style={{ padding: 16, marginBottom: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 8 }}>{a.title}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
                   <Badge text={`Due: ${a.due_date}`} bg={C.bg} color={C.muted} />
@@ -292,7 +295,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             <button onClick={() => setShowForm(!showForm)} style={{ display: "flex", alignItems: "center", gap: 8, background: "#8B5CF6", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", marginBottom: 16, fontFamily: "Inter,sans-serif" }}>
               <Ic n="plus" s={18} c="#fff" />{showForm ? "Cancel" : "Create Quiz"}
             </button>
-            {showForm && <Card style={{ padding: 20, marginBottom: 20 }}>
+            {showForm && <Card C={C} style={{ padding: 20, marginBottom: 20 }}>
               <div style={{ marginBottom: 12 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.muted, display: "block", marginBottom: 6 }}>Title *</label><input style={inp} value={qForm.title} onChange={(e) => setQForm({ ...qForm, title: e.target.value })} placeholder="Quiz title" /></div>
               <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.muted, display: "block", marginBottom: 6 }}>Duration (min)</label><input style={inp} type="number" value={qForm.duration_minutes} onChange={(e) => setQForm({ ...qForm, duration_minutes: +e.target.value })} /></div>
               {qForm.questions.map((q, i) => <div key={i} style={{ background: C.bg, borderRadius: 10, padding: 10, marginBottom: 8 }}><div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Q{i+1}. {q.q}</div>{q.options.map((o,oi)=><div key={oi} style={{ fontSize:12, color: oi===q.answer ? C.success : C.muted, marginTop:3 }}>{oi===q.answer?"✓ ":"  "}{o}</div>)}</div>)}
@@ -305,7 +308,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
               <button onClick={createQuiz} style={{ background:C.success, color:"#fff", border:"none", borderRadius:12, padding:"12px 0", width:"100%", fontWeight:700, cursor:"pointer", fontFamily:"Inter,sans-serif" }}>Publish Quiz</button>
             </Card>}
             {quizzes.length===0&&!showForm&&<div style={{textAlign:"center",color:C.muted,padding:"40px 0"}}>No quizzes yet.</div>}
-            {quizzes.map((q)=><Card key={q.id} style={{padding:16,marginBottom:10}}><div style={{fontWeight:700,fontSize:14,color:C.text}}>{q.title}</div><div style={{fontSize:12,color:C.muted,marginTop:4}}>{q.questions?.length||0} questions · {q.duration_minutes} min</div></Card>)}
+            {quizzes.map((q)=><Card C={C} key={q.id} style={{padding:16,marginBottom:10}}><div style={{fontWeight:700,fontSize:14,color:C.text}}>{q.title}</div><div style={{fontSize:12,color:C.muted,marginTop:4}}>{q.questions?.length||0} questions · {q.duration_minutes} min</div></Card>)}
           </div>
         )}
 
@@ -315,7 +318,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             {students.filter(Boolean).map((s)=>{
               const existing=grades.find(g=>g.student_id===s.id);
               const gf=gradeForm[s.id]||{ca1:existing?.ca1??"",ca2:existing?.ca2??"",midterm:existing?.midterm??"",exam:existing?.exam??""};
-              return <Card key={s.id} style={{padding:16,marginBottom:12}}>
+              return <Card C={C} key={s.id} style={{padding:16,marginBottom:12}}>
                 <div style={{fontWeight:700,fontSize:14,color:C.text}}>{s.name}</div>
                 <div style={{fontSize:12,color:C.muted,marginBottom:12}}>Matric: {s.matric}</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:12}}>
@@ -334,7 +337,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             <button onClick={() => setShowForm(!showForm)} style={{ display:"flex", alignItems:"center", gap:8, background:C.primary, color:"#fff", border:"none", borderRadius:12, padding:"12px 20px", fontWeight:700, cursor:"pointer", marginBottom:16, fontFamily:"Inter,sans-serif" }}>
               <Ic n="plus" s={18} c="#fff" />{showForm ? "Cancel" : "Add Time Slot"}
             </button>
-            {showForm && <Card style={{ padding: 20, marginBottom: 20 }}>
+            {showForm && <Card C={C} style={{ padding: 20, marginBottom: 20 }}>
               <div style={{ marginBottom: 12 }}><label style={{ fontSize:12, fontWeight:600, color:C.muted, display:"block", marginBottom:6 }}>Day</label><select style={inp} value={ttForm.day} onChange={(e)=>setTtForm({...ttForm,day:e.target.value})}>{DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select></div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
                 <div><label style={{ fontSize:12, fontWeight:600, color:C.muted, display:"block", marginBottom:6 }}>Start</label><input style={inp} type="time" value={ttForm.start_time} onChange={(e)=>setTtForm({...ttForm,start_time:e.target.value})}/></div>
@@ -346,7 +349,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>📌 Students enrolled in this course see these slots automatically in their timetable.</div>
             {timetableSlots.length===0&&!showForm&&<div style={{textAlign:"center",color:C.muted,padding:"40px 0"}}>No slots yet.</div>}
             {timetableSlots.map((slot)=>(
-              <Card key={slot.id} style={{ padding:16, marginBottom:10, display:"flex", alignItems:"center", gap:12 }}>
+              <Card C={C} key={slot.id} style={{ padding:16, marginBottom:10, display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ textAlign:"center", minWidth:60 }}><div style={{ fontSize:13, fontWeight:700, color:C.primary }}>{slot.start_time}</div><div style={{ fontSize:11, color:C.muted }}>{slot.end_time}</div></div>
                 <div style={{ width:3, height:36, background:selected.color||C.primary, borderRadius:3 }}/>
                 <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:13, color:C.text }}>{slot.day}</div><div style={{ fontSize:12, color:C.muted }}>📍 {slot.venue}</div></div>
@@ -378,7 +381,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
               <div style={{ position:"absolute", top:-20, right:-20, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.07)" }}/>
               <div style={{ fontSize:11, opacity:0.65, letterSpacing:1, fontWeight:600 }}>{facultyDisplay}</div>
               <div style={{ fontSize:28, fontWeight:800, marginTop:6, letterSpacing:-0.5 }}>{user?.name}</div>
-              <div style={{ fontSize:13, opacity:0.7, marginTop:4 }}>Lecturer · {user?.department}</div>
+              <div style={{ fontSize:13, opacity:0.7, marginTop:4 }}>Lecturer{user?.department ? ` · ${user.department}` : ""}</div>
               <div style={{ display:"flex", gap:10, marginTop:16 }}>
                 <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:10, padding:"6px 14px", fontSize:12, fontWeight:600 }}>{courses.length} Course{courses.length!==1?"s":""}</div>
               </div>
@@ -427,14 +430,14 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             <button onClick={()=>setShowForm(!showForm)} style={{ display:"flex", alignItems:"center", gap:8, background:C.primary, color:"#fff", border:"none", borderRadius:12, padding:"12px 20px", fontWeight:700, cursor:"pointer", marginBottom:20, fontFamily:"Inter,sans-serif" }}>
               <Ic n="plus" s={18} c="#fff"/>{showForm?"Cancel":"Post Announcement"}
             </button>
-            {showForm && <Card style={{ padding:20, marginBottom:20 }}>
+            {showForm && <Card C={C} style={{ padding:20, marginBottom:20 }}>
               <div style={{ marginBottom:12 }}><label style={{ fontSize:12, fontWeight:600, color:C.muted, display:"block", marginBottom:6 }}>Title *</label><input style={inp} value={annForm.title} onChange={(e)=>setAnnForm({...annForm,title:e.target.value})} placeholder="Title"/></div>
               <div style={{ marginBottom:12 }}><label style={{ fontSize:12, fontWeight:600, color:C.muted, display:"block", marginBottom:6 }}>Message *</label><textarea style={{...inp,minHeight:100,resize:"none"}} value={annForm.body} onChange={(e)=>setAnnForm({...annForm,body:e.target.value})} placeholder="Write your message..."/></div>
               <div style={{ marginBottom:16 }}><label style={{ fontSize:12, fontWeight:600, color:C.muted, display:"block", marginBottom:6 }}>Priority</label><select style={inp} value={annForm.priority} onChange={(e)=>setAnnForm({...annForm,priority:e.target.value})}><option value="normal">Normal</option><option value="high">High (Urgent)</option></select></div>
               <button onClick={postAnnouncement} style={{ background:C.success, color:"#fff", border:"none", borderRadius:12, padding:"12px 0", width:"100%", fontWeight:700, cursor:"pointer", fontFamily:"Inter,sans-serif" }}>Post</button>
             </Card>}
             {announcements.map((a)=>(
-              <Card key={a.id} style={{ padding:16, marginBottom:12 }}>
+              <Card C={C} key={a.id} style={{ padding:16, marginBottom:12 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
                   <div style={{ flex:1, fontWeight:700, fontSize:14, color:C.text }}>{a.title}</div>
                   {a.priority==="high"&&<Badge text="Urgent" bg="#FEE2E2" color="#EF4444"/>}
@@ -453,17 +456,17 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
 
         {tab === "more" && (
           <div>
-            <Card style={{ padding:20, marginBottom:20, display:"flex", alignItems:"center", gap:16 }}>
+            <Card C={C} style={{ padding:20, marginBottom:20, display:"flex", alignItems:"center", gap:16 }}>
               <div style={{ width:56, height:56, borderRadius:"50%", background:"linear-gradient(135deg,#1B4332,#2D6A4F)", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", flexShrink:0 }}>
                 {user?.avatar_url?<img src={user.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Ic n="user" s={26} c="#fff"/>}
               </div>
               <div style={{ flex:1 }}>
                 <div style={{ fontWeight:800, fontSize:16, color:C.text }}>{user?.name}</div>
                 <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>{user?.email}</div>
-                <div style={{ fontSize:12, color:C.muted }}>Lecturer · {user?.department}</div>
+                <div style={{ fontSize:12, color:C.muted }}>Lecturer{user?.department ? ` · ${user.department}` : ""}</div>
               </div>
             </Card>
-            <Card style={{ padding:16, marginBottom:10, display:"flex", alignItems:"center", gap:14 }}>
+            <Card C={C} style={{ padding:16, marginBottom:10, display:"flex", alignItems:"center", gap:14 }}>
               <div style={{ width:44, height:44, background:C.primary+"18", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n={dark?"sun":"moon"} s={20} c={C.primary}/></div>
               <div style={{ flex:1 }}><div style={{ fontWeight:700, fontSize:14, color:C.text }}>{dark?"Light Mode":"Dark Mode"}</div></div>
               <div onClick={()=>setDark(!dark)} style={{ width:50, height:28, borderRadius:14, background:dark?C.primary:C.border, position:"relative", cursor:"pointer", transition:"background 0.3s" }}>

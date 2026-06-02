@@ -107,6 +107,7 @@ export default function Courses({ user, C, onCall }) {
     const { error: ue } = await supabase.storage.from("unilearn").upload(filePath, file);
     if (ue) { setError("Upload failed: " + ue.message); setUploading(false); return; }
     const { data: urlData } = supabase.storage.from("unilearn").getPublicUrl(filePath);
+    if (!urlData?.publicUrl) { setError("Failed to get file URL. Please try again."); setUploading(false); return; }
     const type = file.name.match(/\.pdf$/i) ? "PDF" : file.name.match(/\.(mp4|mov)$/i) ? "Video" : file.name.match(/\.(jpg|jpeg|png)$/i) ? "Image" : "Document";
     await supabase.from("materials").insert({
       course_id: selected.id,
@@ -145,17 +146,18 @@ export default function Courses({ user, C, onCall }) {
   };
 
   const submitQuiz = useCallback(async () => {
+    const questions = activeQuiz?.questions || [];
     let score = 0;
-    activeQuiz.questions.forEach((q, i) => { if (answers[i] === q.answer) score++; });
+    questions.forEach((q, i) => { if (answers[i] === q.answer) score++; });
     await supabase.from("quiz_attempts").upsert({
       quiz_id: activeQuiz.id,
       student_id: user.id,
       score,
-      total: activeQuiz.questions.length,
+      total: questions.length,
       answers: JSON.stringify(answers),
       submitted_at: new Date().toISOString(),
     });
-    setQuizResult({ score, total: activeQuiz.questions.length, answers: { ...answers } });
+    setQuizResult({ score, total: questions.length, answers: { ...answers } });
   }, [activeQuiz, answers, user.id]);
 
   // Keep the ref current so the timer always calls the latest version
@@ -277,14 +279,14 @@ export default function Courses({ user, C, onCall }) {
       {/* Progress bar */}
       <div style={{ background: C.card, borderRadius: 12, padding: "8px 14px", marginBottom: 16, border: `1px solid ${C.border}` }}>
         <div style={{ background: C.border, borderRadius: 10, height: 6, overflow: "hidden" }}>
-          <div style={{ background: C.primary, height: "100%", width: `${(Object.keys(answers).length / activeQuiz.questions.length) * 100}%`, borderRadius: 10, transition: "width 0.3s" }} />
+          <div style={{ background: C.primary, height: "100%", width: `${(Object.keys(answers).length / (activeQuiz.questions?.length || 1)) * 100}%`, borderRadius: 10, transition: "width 0.3s" }} />
         </div>
         <div style={{ fontSize: 11, color: C.muted, marginTop: 6, textAlign: "center" }}>
-          {Object.keys(answers).length} of {activeQuiz.questions.length} answered
+          {Object.keys(answers).length} of {activeQuiz.questions?.length || 0} answered
         </div>
       </div>
       {/* Questions */}
-      {activeQuiz.questions.map((q, qi) => (
+      {(activeQuiz.questions || []).map((q, qi) => (
         <div key={qi} style={{ background: C.card, borderRadius: 16, padding: 20, marginBottom: 14, border: `1px solid ${C.border}` }}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16, lineHeight: 1.5, color: C.text }}>
             Q{qi + 1}. {q.q}
@@ -321,7 +323,7 @@ export default function Courses({ user, C, onCall }) {
           cursor: "pointer", fontFamily: "Inter,sans-serif", marginBottom: 40,
         }}
       >
-        Submit Quiz ({Object.keys(answers).length}/{activeQuiz.questions.length} answered)
+        Submit Quiz ({Object.keys(answers).length}/{activeQuiz.questions?.length || 0} answered)
       </button>
     </div>
   );
@@ -352,7 +354,7 @@ export default function Courses({ user, C, onCall }) {
         {/* Answer Review — new feature */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 12 }}>📋 Answer Review</div>
-          {activeQuiz.questions.map((q, qi) => {
+          {(activeQuiz?.questions || []).map((q, qi) => {
             const userAnswer = quizResult.answers[qi];
             const correct = userAnswer === q.answer;
             return (

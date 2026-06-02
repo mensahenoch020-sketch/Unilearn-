@@ -76,9 +76,9 @@ export default function Timetable({ user, C }) {
                 No classes
               </div>
             ) : (
-              daySlots.map((slot, i) => (
+              daySlots.map((slot) => (
                 <div
-                  key={i}
+                  key={slot.id}
                   style={{
                     background: C.card,
                     borderRadius: 14,

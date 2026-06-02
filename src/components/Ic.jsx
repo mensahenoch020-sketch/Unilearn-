@@ -48,7 +48,7 @@ export default function Ic({ n, s = 20, c = "currentColor", w = 1.8 }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      {paths[n]}
+      {paths[n] ?? <circle cx="12" cy="12" r="2" />}
     </svg>
   );
 }
