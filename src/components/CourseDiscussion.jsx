@@ -59,28 +59,33 @@ export default function CourseDiscussion({ course, user, C, onCall }) {
     setReplyPosts((prev) => ({ ...prev, [postId]: data || [] }));
   };
 
+  const [postError, setPostError] = useState("");
+
   const postMessage = async () => {
     if (!newPost.trim()) return;
-    await supabase.from("forum_posts").insert({
+    setPostError("");
+    const { error } = await supabase.from("forum_posts").insert({
       course_id: course.id,
       author_id: user.id,
       content: newPost.trim(),
       parent_id: null,
     });
+    if (error) { setPostError("Failed to post. Please try again."); return; }
     setNewPost("");
-    // Real-time will reload, but also reload manually for instant feedback
     loadPosts();
   };
 
   const postReply = async (parentId) => {
     const text = replies[parentId];
     if (!text?.trim()) return;
-    await supabase.from("forum_posts").insert({
+    setPostError("");
+    const { error } = await supabase.from("forum_posts").insert({
       course_id: course.id,
       author_id: user.id,
       content: text.trim(),
       parent_id: parentId,
     });
+    if (error) { setPostError("Failed to post reply. Please try again."); return; }
     setReplies({ ...replies, [parentId]: "" });
     loadReplies(parentId);
   };
@@ -182,6 +187,9 @@ export default function CourseDiscussion({ course, user, C, onCall }) {
             <Ic n="send" s={14} c="#fff" /> Post
           </button>
         </div>
+        {postError && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "#EF4444" }}>{postError}</div>
+        )}
       </div>
 
       {/* Posts list */}
@@ -241,9 +249,9 @@ export default function CourseDiscussion({ course, user, C, onCall }) {
             {/* Replies */}
             {expanded[p.id] && (
               <div style={{ paddingLeft: 46 }}>
-                {(replyPosts[p.id] || []).map((r, i) => (
+                {(replyPosts[p.id] || []).map((r) => (
                   <div
-                    key={i}
+                    key={r.id}
                     style={{ marginBottom: 10, paddingLeft: 12, borderLeft: `2px solid ${C.border}` }}
                   >
                     <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>

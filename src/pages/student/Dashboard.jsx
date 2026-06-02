@@ -75,7 +75,7 @@ export default function Dashboard({ user, C }) {
         <div style={{ fontSize: 11, opacity: 0.65, fontWeight: 600, letterSpacing: 1 }}>{facultyDisplay}</div>
         <div style={{ fontSize: 13, opacity: 0.8, marginTop: 4 }}>{greeting} 👋</div>
         <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4, letterSpacing: -0.5 }}>{user?.name}</div>
-        <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4 }}>{user?.department} · {user?.level}</div>
+        <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4 }}>{user?.department || ""}{user?.department && user?.level ? " · " : ""}{user?.level || ""}</div>
         <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
           <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 10, padding: "6px 14px", fontSize: 12, fontWeight: 600 }}>{enrolledCourses.length} Course{enrolledCourses.length !== 1 ? "s" : ""}</div>
           {upcomingDeadlines.length > 0 && <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 10, padding: "6px 14px", fontSize: 12, fontWeight: 600 }}>{upcomingDeadlines.length} Due soon</div>}
@@ -111,7 +111,9 @@ export default function Dashboard({ user, C }) {
         <>
           <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 12, color: C.muted, letterSpacing: 0.8 }}>⏰ DUE THIS WEEK</div>
           {upcomingDeadlines.map((a) => {
+            if (!a.due_date) return null;
             const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
+            if (!isFinite(days)) return null;
             return (
               <div key={a.id} onClick={() => navigate("/courses")}
                 style={{ background: C.card, borderRadius: 16, padding: 14, marginBottom: 10, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
