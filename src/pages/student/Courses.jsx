@@ -38,6 +38,7 @@ export default function Courses({ user, C, onCall }) {
   const [showEnroll, setShowEnroll] = useState(false);
   const [lecturerId, setLecturerId] = useState(null);
   const [lecturerName, setLecturerName] = useState("Lecturer");
+  const [lecturerMap, setLecturerMap] = useState({});
   const [announcements, setAnnouncements] = useState([]);
   const [confirmDropId, setConfirmDropId] = useState(null);
   const fileRef = useRef();
@@ -54,6 +55,27 @@ export default function Courses({ user, C, onCall }) {
     setCourses(enrolled);
     const { data: all } = await supabase.from("courses").select("*").order("code");
     setAllCourses(all || []);
+
+    // Fetch lecturers for all enrolled courses so cards can show the name
+    const ids = enrolled.map((c) => c.id);
+    if (ids.length > 0) {
+      const { data: lcs } = await supabase
+        .from("lecturer_courses")
+        .select("course_id, lecturer_id")
+        .in("course_id", ids);
+      if (lcs?.length) {
+        const uids = [...new Set(lcs.map((l) => l.lecturer_id))];
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, name, avatar_url")
+          .in("id", uids);
+        const profMap = {};
+        (profs || []).forEach((p) => { profMap[p.id] = p; });
+        const map = {};
+        lcs.forEach((lc) => { map[lc.course_id] = profMap[lc.lecturer_id] || null; });
+        setLecturerMap(map);
+      }
+    }
     setLoading(false);
   };
 
@@ -473,7 +495,7 @@ export default function Courses({ user, C, onCall }) {
   // ── COURSE DETAIL ─────────────────────────────────────
   if (selected) return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
         <button onClick={() => { setSelected(null); setMessage(""); setError(""); }} style={{ background: "none", border: "none", cursor: "pointer" }}>
           <Ic n="chevronL" s={22} c={C.primary} />
         </button>
@@ -482,6 +504,29 @@ export default function Courses({ user, C, onCall }) {
           <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{selected.title}</div>
         </div>
         <Badge text={`${selected.units}u`} bg={(selected.color || "#1B4332") + "18"} color={selected.color || "#1B4332"} />
+      </div>
+
+      {/* Lecturer info bar */}
+      <div style={{ background: C.card, borderRadius: 14, padding: "12px 16px", marginBottom: 16, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.primary + "20", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
+          {lecturerMap[selected.id]?.avatar_url
+            ? <img src={lecturerMap[selected.id].avatar_url} alt="lec" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <Ic n="user" s={17} c={C.primary} />}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Lecturer</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+            {lecturerName !== "Lecturer" ? lecturerName : (lecturerMap[selected.id]?.name || "Not assigned yet")}
+          </div>
+        </div>
+        {(lecturerId || lecturerMap[selected.id]?.id) && (
+          <button
+            onClick={() => setActiveTab("messages")}
+            style={{ background: C.primary, color: "#fff", border: "none", borderRadius: 10, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
+          >
+            <Ic n="msg" s={13} c="#fff" /> Message
+          </button>
+        )}
       </div>
 
       {/* Tab bar */}
@@ -704,7 +749,10 @@ export default function Courses({ user, C, onCall }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{c.code}</div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{c.title}</div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{c.title}</div>
+                <div style={{ fontSize: 11, color: lecturerMap[c.id] ? C.primary : C.muted, marginTop: 3, fontWeight: lecturerMap[c.id] ? 600 : 400 }}>
+                  {lecturerMap[c.id] ? `👤 ${lecturerMap[c.id].name}` : "No lecturer assigned"}
+                </div>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
