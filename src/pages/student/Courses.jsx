@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../supabase.js";
 import { gradeOf, validateFile } from "../../utils/grades.js";
 import { ALLOWED_MATERIAL_TYPES, ALLOWED_SUBMISSION_TYPES, MAX_FILE_SIZE_MB } from "../../data.js";
@@ -36,6 +36,7 @@ export default function Courses({ user, C, onCall }) {
 
   const [showEnroll, setShowEnroll] = useState(false);
   const fileRef = useRef();
+  const submitQuizRef = useRef(null);
 
   useEffect(() => { loadCourses(); }, []);
 
@@ -59,7 +60,12 @@ export default function Courses({ user, C, onCall }) {
     setTimeLeft(activeQuiz.duration_minutes * 60);
     const t = setInterval(() => {
       setTimeLeft((p) => {
-        if (p <= 1) { clearInterval(t); submitQuiz(); return 0; }
+        if (p <= 1) {
+          clearInterval(t);
+          // Use ref so the callback always has the latest answers state
+          submitQuizRef.current?.();
+          return 0;
+        }
         return p - 1;
       });
     }, 1000);
@@ -138,7 +144,7 @@ export default function Courses({ user, C, onCall }) {
     setSubmitting(false);
   };
 
-  const submitQuiz = async () => {
+  const submitQuiz = useCallback(async () => {
     let score = 0;
     activeQuiz.questions.forEach((q, i) => { if (answers[i] === q.answer) score++; });
     await supabase.from("quiz_attempts").upsert({
@@ -150,7 +156,10 @@ export default function Courses({ user, C, onCall }) {
       submitted_at: new Date().toISOString(),
     });
     setQuizResult({ score, total: activeQuiz.questions.length, answers: { ...answers } });
-  };
+  }, [activeQuiz, answers, user.id]);
+
+  // Keep the ref current so the timer always calls the latest version
+  submitQuizRef.current = submitQuiz;
 
   const enrollInCourse = async (courseId) => {
     await supabase.from("enrollments").upsert({ student_id: user.id, course_id: courseId }, { onConflict: "student_id,course_id" });

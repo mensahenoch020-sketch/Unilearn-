@@ -51,7 +51,7 @@ export default function Timetable({ user, C }) {
       {DAYS.map((day) => {
         const daySlots = slots.filter((s) => s.day === day);
         const isToday = day === today;
-        if (slots.length === 0 && daySlots.length === 0) return null;
+        if (daySlots.length === 0 && slots.length === 0) return null;
 
         return (
           <div key={day} style={{ marginBottom: 20 }}>

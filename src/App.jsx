@@ -69,31 +69,51 @@ export default function App() {
   }, [dark]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
-        setUser(profile);
-        await checkEnrollments(profile);
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+          if (profile) {
+            setUser(profile);
+            await checkEnrollments(profile);
+          }
+        }
+      } catch (err) {
+        console.error("Auth init error:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
+
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
-        setUser(profile);
-      } else {
+      if (event === "SIGNED_OUT" || !session) {
         setUser(null);
         setShowEnrollment(false);
         setShowLecturerEnrollment(false);
+        return;
+      }
+
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+        if (profile) {
+          setUser(profile);
+          if (event === "SIGNED_IN") {
+            await checkEnrollments(profile);
+          }
+        }
+      } catch (err) {
+        console.error("Auth state change error:", err);
       }
     });
 
@@ -102,18 +122,22 @@ export default function App() {
 
   const checkEnrollments = async (profile) => {
     if (!profile) return;
-    if (profile.role === "student") {
-      const { data: enr } = await supabase
-        .from("enrollments")
-        .select("id")
-        .eq("student_id", profile.id);
-      if (!enr || enr.length === 0) setShowEnrollment(true);
-    } else if (profile.role === "lecturer") {
-      const { data: lc } = await supabase
-        .from("lecturer_courses")
-        .select("id")
-        .eq("lecturer_id", profile.id);
-      if (!lc || lc.length === 0) setShowLecturerEnrollment(true);
+    try {
+      if (profile.role === "student") {
+        const { data: enr } = await supabase
+          .from("enrollments")
+          .select("id")
+          .eq("student_id", profile.id);
+        if (!enr || enr.length === 0) setShowEnrollment(true);
+      } else if (profile.role === "lecturer") {
+        const { data: lc } = await supabase
+          .from("lecturer_courses")
+          .select("id")
+          .eq("lecturer_id", profile.id);
+        if (!lc || lc.length === 0) setShowLecturerEnrollment(true);
+      }
+    } catch (err) {
+      console.error("checkEnrollments error:", err);
     }
   };
 
