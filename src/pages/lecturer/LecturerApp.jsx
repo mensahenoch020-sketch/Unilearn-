@@ -7,6 +7,8 @@ import Badge from "../../components/Badge.jsx";
 import Spinner from "../../components/Spinner.jsx";
 import CallScreen from "../../components/CallScreen.jsx";
 import CourseDiscussion from "../../components/CourseDiscussion.jsx";
+import DirectMessage from "../../components/DirectMessage.jsx";
+import LecturerCourseEnrollment from "./LecturerCourseEnrollment.jsx";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
@@ -33,11 +35,16 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   const [timetableSlots, setTimetableSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selAssignment, setSelAssignment] = useState(null);
   const [callType, setCallType] = useState(null);
+  const [showManageCourses, setShowManageCourses] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [dmStudents, setDmStudents] = useState([]);
+  const [dmStudent, setDmStudent] = useState(null);
   const [aForm, setAForm] = useState({ title: "", description: "", due_date: "", max_score: 20 });
   const [annForm, setAnnForm] = useState({ title: "", body: "", priority: "normal" });
   const [qForm, setQForm] = useState({ title: "", duration_minutes: 15, questions: [] });
@@ -169,7 +176,64 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     await supabase.from("timetable").delete().eq("id", id); loadData();
   };
 
+  const removeCourse = async (courseId) => {
+    await supabase.from("lecturer_courses").delete().eq("lecturer_id", user.id).eq("course_id", courseId);
+    loadCourses();
+  };
+
+  const saveAllGrades = async () => {
+    const rows = students.filter(Boolean).map(s => {
+      const g = gradeForm[s.id];
+      if (!g) return null;
+      return { student_id: s.id, course_id: selected.id, ca1: +g.ca1 || 0, ca2: +g.ca2 || 0, midterm: +g.midterm || 0, exam: g.exam ? +g.exam : null };
+    }).filter(Boolean);
+    if (rows.length === 0) return setMessage("Enter grades first.");
+    await supabase.from("grades").upsert(rows);
+    setMessage("All grades saved!");
+  };
+
+  const deleteAnnouncement = async (id) => {
+    await supabase.from("announcements").delete().eq("id", id);
+    loadAnnouncements();
+  };
+
+  const uploadAvatar = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { setError("Avatar must be under 5MB."); return; }
+    setUploadingAvatar(true);
+    const ext = file.name.split(".").pop();
+    const filePath = `avatars/${user.id}/${Date.now()}.${ext}`;
+    const { error: ue } = await supabase.storage.from("unilearn").upload(filePath, file, { upsert: true });
+    if (ue) { setError(ue.message || "Avatar upload failed."); setUploadingAvatar(false); return; }
+    const { data: urlData } = supabase.storage.from("unilearn").getPublicUrl(filePath);
+    await supabase.from("profiles").update({ avatar_url: urlData.publicUrl }).eq("id", user.id);
+    setUser({ ...user, avatar_url: urlData.publicUrl });
+    setUploadingAvatar(false);
+    setMessage("Profile picture updated!");
+  };
+
+  const loadDmStudents = async () => {
+    const { data } = await supabase
+      .from("direct_messages")
+      .select("sender_id")
+      .eq("course_id", selected.id)
+      .eq("receiver_id", user.id);
+    const uniqueIds = [...new Set((data || []).map(m => m.sender_id))];
+    if (uniqueIds.length === 0) { setDmStudents([]); return; }
+    const { data: profs } = await supabase.from("profiles").select("id, name, matric").in("id", uniqueIds);
+    setDmStudents(profs || []);
+  };
+
   if (callType) return <CallScreen callType={callType} onClose={() => setCallType(null)} />;
+
+  if (showManageCourses) return (
+    <LecturerCourseEnrollment
+      user={user}
+      onDone={() => { setShowManageCourses(false); loadCourses(); }}
+      initialSelected={courses.map(c => c.id)}
+    />
+  );
 
   const NAV = [
     { id: "home", icon: "home", label: "Home" },
@@ -228,7 +292,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
       </div>
       <div style={{ padding: "20px", paddingBottom: 40 }}>
         <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
-          {[["materials","file","Materials"],["assignments","clip","Tasks"],["quizzes","chart","Quizzes"],["grades","user","Grades"],["timetable","calendar","Timetable"],["discussion","send","Forum"]].map(([t, icon, label]) => (
+          {[["materials","file","Materials"],["assignments","clip","Tasks"],["quizzes","chart","Quizzes"],["grades","user","Grades"],["timetable","calendar","Timetable"],["discussion","send","Forum"],["messages","msg","Messages"]].map(([t, icon, label]) => (
             <button key={t} onClick={() => { setActiveTab(t); setShowForm(false); setMessage(""); setError(""); }}
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "8px 14px", borderRadius: 12, border: "none", background: activeTab === t ? C.primary : C.card, cursor: "pointer", flexShrink: 0, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
               <Ic n={icon} s={16} c={activeTab === t ? "#fff" : C.muted} />
@@ -314,6 +378,11 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
 
         {activeTab === "grades" && (
           <div>
+            {students.length > 0 && (
+              <button onClick={saveAllGrades} style={{ display: "flex", alignItems: "center", gap: 8, background: C.success, color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontWeight: 700, cursor: "pointer", marginBottom: 16, fontFamily: "Inter,sans-serif" }}>
+                <Ic n="check" s={16} c="#fff" w={2.5} /> Save All Grades
+              </button>
+            )}
             {students.length===0&&<div style={{textAlign:"center",color:C.muted,padding:"40px 0"}}>No students enrolled yet.</div>}
             {students.filter(Boolean).map((s)=>{
               const existing=grades.find(g=>g.student_id===s.id);
@@ -360,6 +429,39 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
         )}
 
         {activeTab === "discussion" && <CourseDiscussion course={selected} user={user} C={C} onCall={setCallType} />}
+
+        {activeTab === "messages" && (
+          dmStudent ? (
+            <div>
+              <button onClick={() => setDmStudent(null)} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", marginBottom: 16, color: C.primary, fontWeight: 700, fontSize: 13, fontFamily: "Inter,sans-serif" }}>
+                <Ic n="chevronL" s={16} c={C.primary} /> Back to Students
+              </button>
+              <DirectMessage course={selected} user={user} C={C} otherUserId={dmStudent.id} otherUserName={dmStudent.name} />
+            </div>
+          ) : (
+            <div>
+              <button onClick={loadDmStudents} style={{ display: "flex", alignItems: "center", gap: 8, background: C.primary, color: "#fff", border: "none", borderRadius: 12, padding: "10px 16px", fontWeight: 700, cursor: "pointer", marginBottom: 16, fontSize: 13, fontFamily: "Inter,sans-serif" }}>
+                <Ic n="msg" s={15} c="#fff" /> Load Messages
+              </button>
+              {dmStudents.length === 0 ? (
+                <div style={{ textAlign: "center", color: C.muted, padding: "40px 0", fontSize: 13 }}>No students have messaged you yet for this course.</div>
+              ) : (
+                dmStudents.map(s => (
+                  <Card C={C} key={s.id} style={{ padding: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => setDmStudent(s)}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.primary + "20", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Ic n="user" s={18} c={C.primary} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{s.name}</div>
+                      {s.matric && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Matric: {s.matric}</div>}
+                    </div>
+                    <Ic n="chevronR" s={16} c={C.muted} />
+                  </Card>
+                ))
+              )}
+            </div>
+          )
+        )}
       </div>
     </div>
   );
@@ -386,7 +488,12 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
                 <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:10, padding:"6px 14px", fontSize:12, fontWeight:600 }}>{courses.length} Course{courses.length!==1?"s":""}</div>
               </div>
             </div>
-            <div style={{ fontSize:11, fontWeight:700, marginBottom:12, color:C.muted, letterSpacing:0.8 }}>MY COURSES</div>
+            <div style={{ display:"flex", alignItems:"center", marginBottom:12 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:C.muted, letterSpacing:0.8, flex:1 }}>MY COURSES</div>
+              <button onClick={()=>setShowManageCourses(true)} style={{ display:"flex", alignItems:"center", gap:4, background:C.primary, color:"#fff", border:"none", borderRadius:10, padding:"6px 12px", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"Inter,sans-serif" }}>
+                <Ic n="plus" s={12} c="#fff"/>Add Course
+              </button>
+            </div>
             {loading ? <Spinner/> : courses.length===0 ? (
               <div style={{ textAlign:"center", padding:"40px 0", color:C.muted }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>📚</div>
@@ -394,15 +501,19 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
                 <div style={{ fontSize:13 }}>You haven't selected courses to teach.</div>
               </div>
             ) : courses.map((c)=>(
-              <div key={c.id} onClick={()=>{setSelected(c);setActiveTab("materials");}}
-                style={{ background:C.card, borderRadius:16, padding:16, marginBottom:10, border:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:12, cursor:"pointer", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
-                <div style={{ width:48, height:48, background:(c.color||"#1B4332")+"15", borderRadius:14, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="book" s={22} c={c.color||"#1B4332"}/></div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{c.code}</div>
-                  <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>{c.title}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{c.level} Level · {c.semester}</div>
+              <div key={c.id}
+                style={{ background:C.card, borderRadius:16, padding:16, marginBottom:10, border:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:12, boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
+                <div onClick={()=>{setSelected(c);setActiveTab("materials");}} style={{ display:"flex", alignItems:"center", gap:12, flex:1, cursor:"pointer" }}>
+                  <div style={{ width:48, height:48, background:(c.color||"#1B4332")+"15", borderRadius:14, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="book" s={22} c={c.color||"#1B4332"}/></div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{c.code}</div>
+                    <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>{c.title}</div>
+                    <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{c.level} Level · {c.semester}</div>
+                  </div>
                 </div>
-                <Ic n="chevronR" s={16} c={C.muted}/>
+                <button onClick={()=>removeCourse(c.id)} style={{ background:"#FEE2E2", border:"none", borderRadius:10, padding:"8px 10px", cursor:"pointer", flexShrink:0 }}>
+                  <Ic n="trash" s={14} c="#EF4444"/>
+                </button>
               </div>
             ))}
           </div>
@@ -441,9 +552,13 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
                 <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
                   <div style={{ flex:1, fontWeight:700, fontSize:14, color:C.text }}>{a.title}</div>
                   {a.priority==="high"&&<Badge text="Urgent" bg="#FEE2E2" color="#EF4444"/>}
+                  {a.author_id===user.id && (
+                    <button onClick={()=>deleteAnnouncement(a.id)} style={{ background:"none", border:"none", cursor:"pointer", padding:4 }}>
+                      <Ic n="trash" s={14} c="#EF4444"/>
+                    </button>
+                  )}
                 </div>
                 <div style={{ fontSize:13, color:C.muted, lineHeight:1.6, marginBottom:10 }}>{a.body}</div>
-                {/* Lecturer name tag */}
                 <div style={{ display:"flex", alignItems:"center", gap:6, paddingTop:10, borderTop:`1px solid ${C.border}` }}>
                   <div style={{ width:20, height:20, borderRadius:"50%", background:"#1B433220", display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="user" s={11} c="#1B4332"/></div>
                   <span style={{ fontSize:11, color:C.muted, fontWeight:600 }}>{a.profiles?.name||"Lecturer"}</span>
@@ -456,15 +571,22 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
 
         {tab === "more" && (
           <div>
-            <Card C={C} style={{ padding:20, marginBottom:20, display:"flex", alignItems:"center", gap:16 }}>
-              <div style={{ width:56, height:56, borderRadius:"50%", background:"linear-gradient(135deg,#1B4332,#2D6A4F)", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", flexShrink:0 }}>
-                {user?.avatar_url?<img src={user.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Ic n="user" s={26} c="#fff"/>}
+            <Card C={C} style={{ padding:20, marginBottom:16, textAlign:"center" }}>
+              <div style={{ position:"relative", width:80, height:80, margin:"0 auto 12px" }}>
+                <div style={{ width:80, height:80, borderRadius:"50%", background:"linear-gradient(135deg,#1B4332,#2D6A4F)", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
+                  {user?.avatar_url?<img src={user.avatar_url} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<Ic n="user" s={32} c="#fff"/>}
+                </div>
+                <label style={{ position:"absolute", bottom:0, right:0, background:"#F4A261", borderRadius:"50%", width:26, height:26, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                  <Ic n="camera" s={13} c="#fff"/>
+                  <input type="file" style={{display:"none"}} accept="image/*" onChange={uploadAvatar}/>
+                </label>
               </div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontWeight:800, fontSize:16, color:C.text }}>{user?.name}</div>
-                <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>{user?.email}</div>
-                <div style={{ fontSize:12, color:C.muted }}>Lecturer{user?.department ? ` · ${user.department}` : ""}</div>
-              </div>
+              <div style={{ fontWeight:800, fontSize:16, color:C.text }}>{user?.name}</div>
+              <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>{user?.email}</div>
+              <div style={{ fontSize:12, color:C.muted }}>Lecturer{user?.department ? ` · ${user.department}` : ""}</div>
+              {uploadingAvatar && <div style={{ fontSize:12, color:C.primary, marginTop:6 }}>Uploading photo...</div>}
+              {message && !selected && <div style={{ fontSize:12, color:"#10B981", marginTop:6 }}>✓ {message}</div>}
+              {error && !selected && <div style={{ fontSize:12, color:"#EF4444", marginTop:6 }}>{error}</div>}
             </Card>
             <Card C={C} style={{ padding:16, marginBottom:10, display:"flex", alignItems:"center", gap:14 }}>
               <div style={{ width:44, height:44, background:C.primary+"18", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n={dark?"sun":"moon"} s={20} c={C.primary}/></div>
@@ -473,8 +595,11 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
                 <div style={{ position:"absolute", top:4, left:dark?26:4, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"left 0.3s", boxShadow:"0 1px 3px rgba(0,0,0,0.2)" }}/>
               </div>
             </Card>
-            <button onClick={onLogout} style={{ background:"#FEE2E2", color:"#EF4444", border:"none", borderRadius:14, padding:"16px 0", width:"100%", fontWeight:700, fontSize:15, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontFamily:"Inter,sans-serif", marginTop:10 }}>
-              <Ic n="logout" s={18} c="#EF4444"/>Sign Out
+            <button
+              onClick={async () => { setSigningOut(true); await onLogout(); setSigningOut(false); }}
+              disabled={signingOut}
+              style={{ background:"#FEE2E2", color:"#EF4444", border:"none", borderRadius:14, padding:"16px 0", width:"100%", fontWeight:700, fontSize:15, cursor:signingOut?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, fontFamily:"Inter,sans-serif", marginTop:10, opacity:signingOut?0.7:1 }}>
+              <Ic n="logout" s={18} c="#EF4444"/>{signingOut ? "Signing out..." : "Sign Out"}
             </button>
           </div>
         )}

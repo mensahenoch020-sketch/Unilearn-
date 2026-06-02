@@ -17,6 +17,7 @@ const inp = {
 export default function Auth({ onLogin }) {
   const [mode, setMode] = useState("login"); // login | signup | forgot
   const [step, setStep] = useState(1);
+  const [showHero, setShowHero] = useState(true);
 
   // Fields
   const [name, setName] = useState("");
@@ -119,6 +120,49 @@ export default function Auth({ onLogin }) {
     setMessage("Password reset link sent! Check your email.");
   };
 
+  if (showHero) return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(160deg, #1B4332 0%, #2D6A4F 60%, #1B4332 100%)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      padding: "40px 24px", fontFamily: "Inter,sans-serif", overflowY: "auto",
+    }}>
+      <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }`}</style>
+      <div style={{ animation: "fadeUp 0.6s ease", width: "100%", maxWidth: 400, textAlign: "center" }}>
+        <div style={{ width: 80, height: 80, background: "#F4A261", borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", boxShadow: "0 12px 40px rgba(244,162,97,0.35)" }}>
+          <Ic n="book" s={38} c="#fff" w={2} />
+        </div>
+        <div style={{ fontSize: 44, fontWeight: 900, color: "#fff", letterSpacing: -2, marginBottom: 4 }}>UniLearn</div>
+        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", marginBottom: 12 }}>University of Ilorin</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "rgba(255,255,255,0.92)", marginBottom: 10, letterSpacing: -0.5 }}>
+          Your campus. Smarter.
+        </div>
+        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 36, lineHeight: 1.7 }}>
+          Courses, grades, quizzes, timetables<br />and announcements — all in one app.
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 40 }}>
+          {[["book","Courses"],["chart","Grades"],["clip","Quizzes"],["calendar","Timetable"],["bell","Notices"],["msg","Messages"]].map(([icon, label]) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.1)", borderRadius: 20, padding: "7px 14px", backdropFilter: "blur(8px)" }}>
+              <Ic n={icon} s={13} c="rgba(255,255,255,0.8)" />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>{label}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <button onClick={() => { setShowHero(false); setMode("login"); }}
+            style={{ background: "#F4A261", color: "#fff", border: "none", borderRadius: 16, padding: "17px 0", width: "100%", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "Inter,sans-serif", boxShadow: "0 8px 24px rgba(244,162,97,0.3)", letterSpacing: -0.3 }}>
+            Sign In
+          </button>
+          <button onClick={() => { setShowHero(false); setMode("signup"); }}
+            style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "2px solid rgba(255,255,255,0.2)", borderRadius: 16, padding: "15px 0", width: "100%", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "Inter,sans-serif" }}>
+            Create Account
+          </button>
+        </div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 32 }}>UniLearn · University of Ilorin · 2025</div>
+      </div>
+    </div>
+  );
+
   return (
     <div
       style={{
@@ -135,6 +179,13 @@ export default function Auth({ onLogin }) {
       <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
       <div style={{ animation: "fadeIn 0.5s ease", width: "100%", maxWidth: 400, paddingBottom: 40 }}>
+        {/* Back to landing */}
+        <div style={{ marginBottom: 12, display: "flex", alignItems: "center" }}>
+          <button onClick={() => setShowHero(true)} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 10, padding: "6px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+            <Ic n="chevronL" s={16} c="#fff" />
+            <span style={{ color: "#fff", fontSize: 12, fontWeight: 600, fontFamily: "Inter,sans-serif" }}>Back</span>
+          </button>
+        </div>
         {/* Logo */}
         <div style={{ marginBottom: 28, textAlign: "center" }}>
           <div

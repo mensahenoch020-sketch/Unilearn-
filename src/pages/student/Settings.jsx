@@ -61,7 +61,7 @@ export default function Settings({ user, setUser, C, onLogout }) {
     const ext = file.name.split(".").pop();
     const filePath = `avatars/${user.id}/${Date.now()}.${ext}`;
     const { error: ue } = await supabase.storage.from("unilearn").upload(filePath, file, { upsert: true });
-    if (ue) { flash("error", "Avatar upload failed."); setUploadingAvatar(false); return; }
+    if (ue) { flash("error", ue.message || "Avatar upload failed."); setUploadingAvatar(false); return; }
     const { data: urlData } = supabase.storage.from("unilearn").getPublicUrl(filePath);
     await supabase.from("profiles").update({ avatar_url: urlData.publicUrl }).eq("id", user.id);
     setAvatarUrl(urlData.publicUrl);

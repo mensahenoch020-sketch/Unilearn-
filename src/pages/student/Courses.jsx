@@ -6,6 +6,7 @@ import Ic from "../../components/Ic.jsx";
 import Badge from "../../components/Badge.jsx";
 import Spinner from "../../components/Spinner.jsx";
 import CourseDiscussion from "../../components/CourseDiscussion.jsx";
+import DirectMessage from "../../components/DirectMessage.jsx";
 
 export default function Courses({ user, C, onCall }) {
   const [courses, setCourses] = useState([]);
@@ -35,6 +36,8 @@ export default function Courses({ user, C, onCall }) {
   const [mySubmissions, setMySubmissions] = useState({});
 
   const [showEnroll, setShowEnroll] = useState(false);
+  const [lecturerId, setLecturerId] = useState(null);
+  const [lecturerName, setLecturerName] = useState("Lecturer");
   const fileRef = useRef();
   const submitQuizRef = useRef(null);
 
@@ -53,6 +56,20 @@ export default function Courses({ user, C, onCall }) {
   };
 
   useEffect(() => { if (selected) loadData(); }, [selected, activeTab]);
+
+  useEffect(() => {
+    if (!selected) return;
+    setLecturerId(null);
+    setLecturerName("Lecturer");
+    supabase.from("lecturer_courses").select("lecturer_id").eq("course_id", selected.id).limit(1).single()
+      .then(({ data }) => {
+        if (!data?.lecturer_id) return;
+        supabase.from("profiles").select("id, name").eq("id", data.lecturer_id).single()
+          .then(({ data: prof }) => {
+            if (prof) { setLecturerId(prof.id); setLecturerName(prof.name || "Lecturer"); }
+          });
+      });
+  }, [selected]);
 
   // Quiz countdown timer — auto-submit on expiry
   useEffect(() => {
@@ -459,7 +476,7 @@ export default function Courses({ user, C, onCall }) {
 
       {/* Tab bar */}
       <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
-        {[["materials", "file", "Materials"], ["assignments", "clip", "Tasks"], ["quizzes", "chart", "Quizzes"], ["discussion", "send", "Forum"]].map(([t, icon, label]) => (
+        {[["materials", "file", "Materials"], ["assignments", "clip", "Tasks"], ["quizzes", "chart", "Quizzes"], ["discussion", "send", "Forum"], ["messages", "msg", "Lecturer"]].map(([t, icon, label]) => (
           <button
             key={t}
             onClick={() => setActiveTab(t)}
@@ -595,6 +612,11 @@ export default function Courses({ user, C, onCall }) {
       {/* Discussion */}
       {activeTab === "discussion" && (
         <CourseDiscussion course={selected} user={user} C={C} onCall={onCall} />
+      )}
+
+      {/* Direct message with lecturer */}
+      {activeTab === "messages" && (
+        <DirectMessage course={selected} user={user} C={C} otherUserId={lecturerId} otherUserName={lecturerName} />
       )}
     </div>
   );

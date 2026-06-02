@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "../../supabase.js";
 import Ic from "../../components/Ic.jsx";
 import CallScreen from "../../components/CallScreen.jsx";
 import Dashboard from "./Dashboard.jsx";
@@ -23,6 +24,22 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [callType, setCallType] = useState(null);
+  const [deadlineCount, setDeadlineCount] = useState(0);
+
+  useEffect(() => {
+    const fetch = async () => {
+      const { data: enr } = await supabase.from("enrollments").select("course_id").eq("student_id", user.id);
+      if (!enr || enr.length === 0) return;
+      const ids = enr.map(e => e.course_id);
+      const { data: asgn } = await supabase.from("assignments").select("due_date").in("course_id", ids);
+      const count = (asgn || []).filter(a => {
+        const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
+        return days >= 0 && days <= 3;
+      }).length;
+      setDeadlineCount(count);
+    };
+    fetch();
+  }, [user.id]);
 
   if (callType) return <CallScreen callType={callType} onClose={() => setCallType(null)} />;
 
@@ -122,6 +139,7 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
         >
           {NAV.map((t) => {
             const active = pathname === t.path;
+            const showBadge = t.path === "/" && deadlineCount > 0;
             return (
               <button
                 key={t.path}
@@ -148,9 +166,20 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
                     alignItems: "center",
                     justifyContent: "center",
                     transition: "background 0.2s",
+                    position: "relative",
                   }}
                 >
                   <Ic n={t.icon} s={22} c={active ? C.primary : C.muted} w={active ? 2.2 : 1.6} />
+                  {showBadge && (
+                    <div style={{
+                      position: "absolute", top: 2, right: 4,
+                      background: "#EF4444", borderRadius: "50%",
+                      width: 16, height: 16, fontSize: 9, fontWeight: 800,
+                      color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {deadlineCount > 9 ? "9+" : deadlineCount}
+                    </div>
+                  )}
                 </div>
                 <span
                   style={{
