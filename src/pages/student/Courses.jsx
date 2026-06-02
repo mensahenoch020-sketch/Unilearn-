@@ -38,6 +38,8 @@ export default function Courses({ user, C, onCall }) {
   const [showEnroll, setShowEnroll] = useState(false);
   const [lecturerId, setLecturerId] = useState(null);
   const [lecturerName, setLecturerName] = useState("Lecturer");
+  const [announcements, setAnnouncements] = useState([]);
+  const [confirmDropId, setConfirmDropId] = useState(null);
   const fileRef = useRef();
   const submitQuizRef = useRef(null);
 
@@ -111,6 +113,14 @@ export default function Courses({ user, C, onCall }) {
       setQuizzes(q || []);
       const { data: att } = await supabase.from("quiz_attempts").select("*").eq("student_id", user.id);
       setAttempts(att || []);
+    }
+    if (activeTab === "announcements") {
+      const { data } = await supabase
+        .from("announcements")
+        .select("id, title, body, created_at, profiles(name)")
+        .eq("course_id", selected.id)
+        .order("created_at", { ascending: false });
+      setAnnouncements(data || []);
     }
   };
 
@@ -476,7 +486,7 @@ export default function Courses({ user, C, onCall }) {
 
       {/* Tab bar */}
       <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
-        {[["materials", "file", "Materials"], ["assignments", "clip", "Tasks"], ["quizzes", "chart", "Quizzes"], ["discussion", "send", "Forum"], ["messages", "msg", "Lecturer"]].map(([t, icon, label]) => (
+        {[["materials", "file", "Materials"], ["assignments", "clip", "Tasks"], ["quizzes", "chart", "Quizzes"], ["announcements", "bell", "Notices"], ["discussion", "send", "Forum"], ["messages", "msg", "Lecturer"]].map(([t, icon, label]) => (
           <button
             key={t}
             onClick={() => setActiveTab(t)}
@@ -609,6 +619,40 @@ export default function Courses({ user, C, onCall }) {
         </div>
       )}
 
+      {/* Announcements */}
+      {activeTab === "announcements" && (
+        <div>
+          {announcements.length === 0 && (
+            <div style={{ textAlign: "center", color: C.muted, padding: "60px 0" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📢</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 6 }}>No announcements yet</div>
+              <div style={{ fontSize: 13 }}>Your lecturer hasn't posted anything for this course.</div>
+            </div>
+          )}
+          {announcements.map(a => {
+            const date = new Date(a.created_at);
+            const isNew = (Date.now() - date.getTime()) < 86400000;
+            return (
+              <div key={a.id} style={{ background: C.card, borderRadius: 16, padding: 18, marginBottom: 12, border: `1px solid ${isNew ? C.primary + "50" : C.border}`, position: "relative" }}>
+                {isNew && (
+                  <div style={{ position: "absolute", top: 14, right: 14, background: C.primary, color: "#fff", fontSize: 9, fontWeight: 800, borderRadius: 20, padding: "3px 8px", letterSpacing: 0.5 }}>NEW</div>
+                )}
+                <div style={{ fontWeight: 800, fontSize: 15, color: C.text, marginBottom: 8, paddingRight: isNew ? 48 : 0 }}>{a.title}</div>
+                <div style={{ fontSize: 13, color: C.text, lineHeight: 1.7, marginBottom: 12 }}>{a.body}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: C.primary + "20", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Ic n="user" s={11} c={C.primary} />
+                  </div>
+                  <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>{a.profiles?.name || "Lecturer"}</span>
+                  <span style={{ fontSize: 11, color: C.muted }}>·</span>
+                  <span style={{ fontSize: 11, color: C.muted }}>{date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Discussion */}
       {activeTab === "discussion" && (
         <CourseDiscussion course={selected} user={user} C={C} onCall={onCall} />
@@ -649,19 +693,45 @@ export default function Courses({ user, C, onCall }) {
         filtered.map((c) => (
           <div
             key={c.id}
-            onClick={() => { setSelected(c); setActiveTab("materials"); }}
-            style={{ background: C.card, borderRadius: 16, padding: 16, marginBottom: 10, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
+            style={{ background: C.card, borderRadius: 16, padding: 16, marginBottom: 10, border: `1px solid ${confirmDropId === c.id ? "#EF4444" : C.border}`, display: "flex", alignItems: "center", gap: 12 }}
           >
-            <div style={{ width: 48, height: 48, background: (c.color || "#1B4332") + "18", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Ic n="book" s={22} c={c.color || "#1B4332"} />
+            <div
+              onClick={() => { setSelected(c); setActiveTab("materials"); setConfirmDropId(null); }}
+              style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, cursor: "pointer", minWidth: 0 }}
+            >
+              <div style={{ width: 48, height: 48, background: (c.color || "#1B4332") + "18", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Ic n="book" s={22} c={c.color || "#1B4332"} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{c.code}</div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{c.title}</div>
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{c.code}</div>
-              <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>{c.title}</div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
               <Badge text={`${c.units}u`} bg={(c.color || "#1B4332") + "18"} color={c.color || "#1B4332"} />
-              <Ic n="chevronR" s={16} c={C.muted} />
+              {confirmDropId === c.id ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); unenroll(c.id); setConfirmDropId(null); }}
+                    style={{ background: "#EF4444", color: "#fff", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Drop
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmDropId(null); }}
+                    style={{ background: C.border, color: C.muted, border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDropId(c.id); }}
+                  style={{ background: "#FEE2E2", border: "none", borderRadius: 8, padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}
+                >
+                  <Ic n="trash" s={14} c="#EF4444" />
+                </button>
+              )}
             </div>
           </div>
         ))
