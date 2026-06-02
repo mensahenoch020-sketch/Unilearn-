@@ -12,6 +12,7 @@ export default function Settings({ user, setUser, C, onLogout }) {
   const [loading, setLoading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || "");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const inp = {
     width: "100%",
@@ -219,7 +220,8 @@ export default function Settings({ user, setUser, C, onLogout }) {
 
       {/* Sign out */}
       <button
-        onClick={onLogout}
+        onClick={async () => { setSigningOut(true); await onLogout(); }}
+        disabled={signingOut}
         style={{
           background: "#FEE2E2",
           color: "#EF4444",
@@ -229,15 +231,16 @@ export default function Settings({ user, setUser, C, onLogout }) {
           width: "100%",
           fontWeight: 700,
           fontSize: 15,
-          cursor: "pointer",
+          cursor: signingOut ? "not-allowed" : "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
           fontFamily: "Inter,sans-serif",
+          opacity: signingOut ? 0.7 : 1,
         }}
       >
-        <Ic n="logout" s={18} c="#EF4444" /> Sign Out
+        <Ic n="logout" s={18} c="#EF4444" /> {signingOut ? "Signing out..." : "Sign Out"}
       </button>
     </div>
   );
