@@ -3,9 +3,9 @@ import { supabase } from "../../supabase.js";
 import Ic from "../../components/Ic.jsx";
 import Spinner from "../../components/Spinner.jsx";
 
-export default function LecturerCourseEnrollment({ user, onDone }) {
+export default function LecturerCourseEnrollment({ user, onDone, initialSelected = [] }) {
   const [courses, setCourses] = useState([]);
-  const [selected, setSelected] = useState([]);
+  const [selected, setSelected] = useState(initialSelected);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
