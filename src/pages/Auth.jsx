@@ -120,45 +120,120 @@ export default function Auth({ onLogin }) {
     setMessage("Password reset link sent! Check your email.");
   };
 
+  const FEATURES = [
+    { icon: "book",     color: "#F4A261", bg: "rgba(244,162,97,0.18)",  title: "Courses",    desc: "All your enrolled courses in one place" },
+    { icon: "chart",    color: "#60A5FA", bg: "rgba(96,165,250,0.18)",  title: "Grades",     desc: "Track your academic performance live" },
+    { icon: "calendar", color: "#34D399", bg: "rgba(52,211,153,0.18)",  title: "Timetable",  desc: "Never miss a class or lab session" },
+    { icon: "bell",     color: "#F472B6", bg: "rgba(244,114,182,0.18)", title: "Notices",    desc: "Announcements delivered instantly" },
+    { icon: "msg",      color: "#A78BFA", bg: "rgba(167,139,250,0.18)", title: "Messages",   desc: "Direct chat with your lecturer" },
+    { icon: "clip",     color: "#FBBF24", bg: "rgba(251,191,36,0.18)",  title: "Assignments",desc: "Deadlines tracked, nothing missed" },
+  ];
+
   if (showHero) return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(160deg, #1B4332 0%, #2D6A4F 60%, #1B4332 100%)",
+      background: "linear-gradient(145deg, #0D2B1E 0%, #1B4332 35%, #2D6A4F 70%, #1B4332 100%)",
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      padding: "40px 24px", fontFamily: "Inter,sans-serif", overflowY: "auto",
+      padding: "48px 22px 40px", fontFamily: "Inter,sans-serif", overflowY: "auto",
+      position: "relative", overflow: "hidden",
     }}>
-      <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }`}</style>
-      <div style={{ animation: "fadeUp 0.6s ease", width: "100%", maxWidth: 400, textAlign: "center" }}>
-        <div style={{ width: 80, height: 80, background: "#F4A261", borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", boxShadow: "0 12px 40px rgba(244,162,97,0.35)" }}>
-          <Ic n="book" s={38} c="#fff" w={2} />
+      <style>{`
+        @keyframes float { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-12px)} }
+        @keyframes pulse-ring { 0%{transform:scale(0.9);opacity:0.7} 100%{transform:scale(1.6);opacity:0} }
+        @keyframes blob1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(30px,-20px) scale(1.08)} 66%{transform:translate(-15px,25px) scale(0.95)} }
+        @keyframes blob2 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-25px,20px) scale(1.05)} 66%{transform:translate(20px,-15px) scale(0.97)} }
+        @keyframes s0{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes s1{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes s2{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes s3{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes s4{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes s5{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+        .hero-btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(244,162,97,0.55)!important}
+        .hero-btn-secondary:hover{background:rgba(255,255,255,0.18)!important;transform:translateY(-2px)}
+        .feature-card:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 12px 32px rgba(0,0,0,0.25)!important}
+      `}</style>
+
+      {/* Decorative background blobs */}
+      <div style={{ position:"absolute", top:-80, right:-80, width:300, height:300, borderRadius:"50%", background:"radial-gradient(circle,rgba(244,162,97,0.12) 0%,transparent 70%)", animation:"blob1 12s ease-in-out infinite", pointerEvents:"none" }} />
+      <div style={{ position:"absolute", bottom:-60, left:-60, width:260, height:260, borderRadius:"50%", background:"radial-gradient(circle,rgba(96,165,250,0.1) 0%,transparent 70%)", animation:"blob2 15s ease-in-out infinite", pointerEvents:"none" }} />
+      <div style={{ position:"absolute", top:"40%", left:-40, width:160, height:160, borderRadius:"50%", background:"radial-gradient(circle,rgba(52,211,153,0.08) 0%,transparent 70%)", animation:"blob1 18s ease-in-out infinite reverse", pointerEvents:"none" }} />
+
+      <div style={{ width:"100%", maxWidth:400, textAlign:"center", position:"relative", zIndex:1 }}>
+
+        {/* Logo with float + pulse ring */}
+        <div style={{ animation:"s0 0.6s cubic-bezier(0.22,1,0.36,1) both", marginBottom:24 }}>
+          <div style={{ position:"relative", width:90, height:90, margin:"0 auto" }}>
+            <div style={{ position:"absolute", inset:0, borderRadius:26, background:"rgba(244,162,97,0.35)", animation:"pulse-ring 2.2s cubic-bezier(0.215,0.61,0.355,1) infinite" }} />
+            <div style={{ position:"absolute", inset:0, borderRadius:26, background:"rgba(244,162,97,0.2)", animation:"pulse-ring 2.2s cubic-bezier(0.215,0.61,0.355,1) infinite 0.5s" }} />
+            <div style={{ position:"relative", width:"100%", height:"100%", background:"linear-gradient(135deg,#F4A261 0%,#E8824A 100%)", borderRadius:26, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 16px 48px rgba(244,162,97,0.45)", animation:"float 3.5s ease-in-out infinite" }}>
+              <Ic n="book" s={40} c="#fff" w={2} />
+            </div>
+          </div>
         </div>
-        <div style={{ fontSize: 44, fontWeight: 900, color: "#fff", letterSpacing: -2, marginBottom: 4 }}>UniLearn</div>
-        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", marginBottom: 12 }}>University of Ilorin</div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: "rgba(255,255,255,0.92)", marginBottom: 10, letterSpacing: -0.5 }}>
-          Your campus. Smarter.
+
+        {/* Brand name */}
+        <div style={{ animation:"s1 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s both" }}>
+          <div style={{ fontSize:46, fontWeight:900, color:"#fff", letterSpacing:-2.5, lineHeight:1, marginBottom:6 }}>UniLearn</div>
+          <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(255,255,255,0.1)", borderRadius:20, padding:"4px 14px", backdropFilter:"blur(12px)" }}>
+            <div style={{ width:6, height:6, borderRadius:"50%", background:"#34D399" }} />
+            <span style={{ fontSize:12, color:"rgba(255,255,255,0.75)", fontWeight:600, letterSpacing:0.5 }}>University of Ilorin</span>
+          </div>
         </div>
-        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 36, lineHeight: 1.7 }}>
-          Courses, grades, quizzes, timetables<br />and announcements — all in one app.
+
+        {/* Tagline */}
+        <div style={{ animation:"s2 0.6s cubic-bezier(0.22,1,0.36,1) 0.2s both", margin:"24px 0 8px" }}>
+          <div style={{ fontSize:24, fontWeight:800, color:"#fff", letterSpacing:-0.8, lineHeight:1.3 }}>
+            Your campus,<br />
+            <span style={{ background:"linear-gradient(90deg,#F4A261,#FBBF24)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>smarter.</span>
+          </div>
+          <div style={{ fontSize:14, color:"rgba(255,255,255,0.5)", marginTop:10, lineHeight:1.8 }}>
+            Everything you need for university life
+          </div>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 40 }}>
-          {[["book","Courses"],["chart","Grades"],["clip","Quizzes"],["calendar","Timetable"],["bell","Notices"],["msg","Messages"]].map(([icon, label]) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.1)", borderRadius: 20, padding: "7px 14px", backdropFilter: "blur(8px)" }}>
-              <Ic n={icon} s={13} c="rgba(255,255,255,0.8)" />
-              <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>{label}</span>
+
+        {/* Feature cards 2-col grid */}
+        <div style={{ animation:"s3 0.6s cubic-bezier(0.22,1,0.36,1) 0.32s both", display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, margin:"28px 0 32px", textAlign:"left" }}>
+          {FEATURES.map(f => (
+            <div key={f.title} className="feature-card" style={{ background:"rgba(255,255,255,0.07)", backdropFilter:"blur(16px)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:16, padding:"14px 14px 12px", transition:"transform 0.2s, box-shadow 0.2s", cursor:"default" }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:f.bg, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:10 }}>
+                <Ic n={f.icon} s={17} c={f.color} w={2} />
+              </div>
+              <div style={{ fontSize:13, fontWeight:700, color:"#fff", marginBottom:3 }}>{f.title}</div>
+              <div style={{ fontSize:11, color:"rgba(255,255,255,0.45)", lineHeight:1.5 }}>{f.desc}</div>
             </div>
           ))}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <button onClick={() => { setShowHero(false); setMode("login"); }}
-            style={{ background: "#F4A261", color: "#fff", border: "none", borderRadius: 16, padding: "17px 0", width: "100%", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "Inter,sans-serif", boxShadow: "0 8px 24px rgba(244,162,97,0.3)", letterSpacing: -0.3 }}>
+
+        {/* Stats strip */}
+        <div style={{ animation:"s4 0.6s cubic-bezier(0.22,1,0.36,1) 0.42s both", display:"flex", justifyContent:"center", gap:24, marginBottom:32 }}>
+          {[["500+","Students"],["30+","Courses"],["Live","Updates"]].map(([num, lbl]) => (
+            <div key={lbl} style={{ textAlign:"center" }}>
+              <div style={{ fontSize:16, fontWeight:900, color:"#F4A261" }}>{num}</div>
+              <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)", fontWeight:600, letterSpacing:0.5, marginTop:1 }}>{lbl}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA buttons */}
+        <div style={{ animation:"s5 0.6s cubic-bezier(0.22,1,0.36,1) 0.52s both", display:"flex", flexDirection:"column", gap:12 }}>
+          <button
+            className="hero-btn-primary"
+            onClick={() => { setShowHero(false); setMode("login"); }}
+            style={{ background:"linear-gradient(90deg,#F4A261 0%,#E8824A 50%,#F4A261 100%)", backgroundSize:"200% auto", color:"#fff", border:"none", borderRadius:16, padding:"18px 0", width:"100%", fontSize:16, fontWeight:800, cursor:"pointer", fontFamily:"Inter,sans-serif", boxShadow:"0 10px 30px rgba(244,162,97,0.4)", letterSpacing:-0.3, transition:"transform 0.2s, box-shadow 0.2s", animation:"shimmer 3s linear infinite" }}>
             Sign In
           </button>
-          <button onClick={() => { setShowHero(false); setMode("signup"); }}
-            style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "2px solid rgba(255,255,255,0.2)", borderRadius: 16, padding: "15px 0", width: "100%", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "Inter,sans-serif" }}>
+          <button
+            className="hero-btn-secondary"
+            onClick={() => { setShowHero(false); setMode("signup"); }}
+            style={{ background:"rgba(255,255,255,0.09)", color:"#fff", border:"1.5px solid rgba(255,255,255,0.2)", borderRadius:16, padding:"16px 0", width:"100%", fontSize:16, fontWeight:700, cursor:"pointer", fontFamily:"Inter,sans-serif", backdropFilter:"blur(12px)", transition:"background 0.2s, transform 0.2s" }}>
             Create Account
           </button>
         </div>
-        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 32 }}>UniLearn · University of Ilorin · 2025</div>
+
+        <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:28, letterSpacing:0.5 }}>
+          UniLearn · University of Ilorin · 2025
+        </div>
       </div>
     </div>
   );
