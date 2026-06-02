@@ -6,14 +6,9 @@ export default function CallScreen({ callType, onClose }) {
   const [roomUrl, setRoomUrl] = useState(null);
 
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL;
-    if (!apiUrl) {
-      setStatus("error");
-      return;
-    }
     const createRoom = async () => {
       try {
-        const res = await fetch(`${apiUrl}/api/call/create`, {
+        const res = await fetch("/api/call/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ callType }),

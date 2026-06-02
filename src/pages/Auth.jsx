@@ -67,9 +67,7 @@ export default function Auth({ onLogin }) {
     setLoading(true);
     setError("");
     try {
-      const apiUrl = import.meta.env.VITE_API_URL;
-      if (!apiUrl) { setError("Server not configured. Please contact support."); setLoading(false); return; }
-      const res = await fetch(`${apiUrl}/api/signup`, {
+      const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
