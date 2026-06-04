@@ -10,6 +10,12 @@ import LecturerApp from "./pages/lecturer/LecturerApp.jsx";
 import LecturerCourseEnrollment from "./pages/lecturer/LecturerCourseEnrollment.jsx";
 
 function SplashScreen() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <div
       style={{
@@ -51,6 +57,11 @@ function SplashScreen() {
           marginTop: 8,
         }}
       />
+      {slow && (
+        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 4 }}>
+          Taking longer than usual…
+        </div>
+      )}
     </div>
   );
 }
@@ -71,7 +82,13 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const timeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 8000)
+        );
+        const { data: { session } } = await Promise.race([
+          supabase.auth.getSession(),
+          timeout,
+        ]);
         if (session) {
           const { data: profile } = await supabase
             .from("profiles")
