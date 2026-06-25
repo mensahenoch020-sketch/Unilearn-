@@ -48,14 +48,25 @@ export default function Auth({ onLogin }) {
     if (!email || !password) return setError("Please fill in all fields.");
     setLoading(true);
     setError("");
-    const { data, error: e } = await supabase.auth.signInWithPassword({ email, password });
-    if (e) { setError(e.message); setLoading(false); return; }
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", data.user.id)
-      .single();
-    onLogin(profile);
+    try {
+      const { data, error: e } = await supabase.auth.signInWithPassword({ email, password });
+      if (e) { setError(e.message); setLoading(false); return; }
+      let { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+      // Retry once if profile not yet available (e.g. just signed up)
+      if (!profile) {
+        await new Promise(r => setTimeout(r, 2000));
+        const { data: p2 } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+        profile = p2;
+      }
+      if (!profile) {
+        setError("Your account profile was not found. Please try signing up again or contact support.");
+        setLoading(false);
+        return;
+      }
+      onLogin(profile);
+    } catch {
+      setError("Sign-in failed. Please check your connection and try again.");
+    }
     setLoading(false);
   };
 
@@ -67,10 +78,14 @@ export default function Auth({ onLogin }) {
       return setError("Please complete your academic details.");
     setLoading(true);
     setError("");
+    setMessage("Creating your account…");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 28000);
     try {
       const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           name,
           email,
@@ -84,6 +99,7 @@ export default function Auth({ onLogin }) {
           semester: role === "student" ? semester : null,
         }),
       });
+      clearTimeout(timeoutId);
       if (!res.ok) {
         const result = await res.json().catch(() => ({}));
         setError(result.error || "Server error. Please try again.");
@@ -92,10 +108,15 @@ export default function Auth({ onLogin }) {
       }
       const result = await res.json();
       if (result.error) { setError(result.error); setLoading(false); return; }
-      setMessage("Account created successfully! You can now sign in.");
+      setMessage("Account created! You can now sign in.");
       switchMode("login");
-    } catch {
-      setError("Something went wrong. Please check your connection and try again.");
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        setError("This is taking too long — the server may be starting up. Please wait 30 seconds and try again.");
+      } else {
+        setError("Something went wrong. Please check your connection and try again.");
+      }
     }
     setLoading(false);
   };

@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../../supabase.js";
 import { validateFile } from "../../utils/grades.js";
+import { playNotif } from "../../utils/sound.js";
 import { ALLOWED_MATERIAL_TYPES, MAX_FILE_SIZE_MB } from "../../data.js";
 import Ic from "../../components/Ic.jsx";
 import Badge from "../../components/Badge.jsx";
@@ -20,18 +21,6 @@ function Card({ children, style = {}, C, onClick }) {
   );
 }
 
-const playNotif = () => {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.type = "sine"; o.frequency.value = 820;
-    g.gain.setValueAtTime(0.25, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-    o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.35);
-  } catch (_) {}
-};
 
 export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout }) {
   const [tab, setTab] = useState("home");
@@ -65,6 +54,12 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   const [gradeForm, setGradeForm] = useState({});
   const [gradeSubForm, setGradeSubForm] = useState({ score: "", feedback: "" });
   const [ttForm, setTtForm] = useState({ day: "Monday", start_time: "08:00", end_time: "10:00", venue: "" });
+  const [msgToast, setMsgToast] = useState(null);
+  const [globalUnread, setGlobalUnread] = useState(0);
+  const [attendanceSessions, setAttendanceSessions] = useState([]);
+  const [takingAttendance, setTakingAttendance] = useState(false);
+  const [attendanceMarks, setAttendanceMarks] = useState({});
+  const toastTimerRef = useRef(null);
 
   const inp = {
     width: "100%", border: `1.5px solid ${C.border}`, borderRadius: 12,
@@ -77,10 +72,41 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     ? user.faculty.toUpperCase()
     : user?.department?.toUpperCase() || "LECTURER";
 
-  useEffect(() => { loadCourses(); loadAnnouncements(); }, []);
+  useEffect(() => { loadCourses(); loadAnnouncements(); loadGlobalUnread(); }, []);
   useEffect(() => { if (selected) loadData(); }, [selected, activeTab]);
 
-  // Real-time listener for new incoming messages — plays sound and refreshes student list
+  // Global real-time listener — fires for ANY new DM sent to this lecturer
+  useEffect(() => {
+    const ch = supabase
+      .channel(`lec_global_dm_${user.id}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "direct_messages",
+        filter: `receiver_id=eq.${user.id}`,
+      }, async (payload) => {
+        playNotif();
+        setGlobalUnread(n => n + 1);
+        // Fetch sender name for toast
+        const { data: sender } = await supabase
+          .from("profiles")
+          .select("name")
+          .eq("id", payload.new.sender_id)
+          .single();
+        const preview = (payload.new.body || "").slice(0, 60);
+        clearTimeout(toastTimerRef.current);
+        setMsgToast({ name: sender?.name || "Student", body: preview, courseId: payload.new.course_id });
+        toastTimerRef.current = setTimeout(() => setMsgToast(null), 5000);
+        // If currently viewing this course's messages tab, refresh
+        if (selected?.id === payload.new.course_id && activeTab === "messages") {
+          loadDmStudents();
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); clearTimeout(toastTimerRef.current); };
+  }, [user.id, selected?.id, activeTab]);
+
+  // Per-course real-time listener when messages tab is open
   useEffect(() => {
     if (!selected || activeTab !== "messages") return;
     const ch = supabase
@@ -92,7 +118,6 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
         filter: `course_id=eq.${selected.id}`,
       }, (payload) => {
         if (payload.new?.receiver_id === user.id) {
-          playNotif();
           loadDmStudents();
         }
       })
@@ -115,6 +140,52 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
       .select("*, profiles(name)")
       .order("created_at", { ascending: false });
     setAnnouncements(data || []);
+  };
+
+  const loadGlobalUnread = async () => {
+    const { count } = await supabase
+      .from("direct_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("receiver_id", user.id)
+      .is("read_at", null);
+    setGlobalUnread(count || 0);
+  };
+
+  const loadAttendance = async () => {
+    if (!selected) return;
+    const { data } = await supabase
+      .from("attendance_sessions")
+      .select("*, attendance_records(*)")
+      .eq("course_id", selected.id)
+      .order("date", { ascending: false });
+    setAttendanceSessions(data || []);
+  };
+
+  const startAttendance = () => {
+    const marks = {};
+    students.forEach(s => { marks[s.id] = true; });
+    setAttendanceMarks(marks);
+    setTakingAttendance(true);
+  };
+
+  const saveAttendance = async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const { data: session } = await supabase
+      .from("attendance_sessions")
+      .insert({ course_id: selected.id, lecturer_id: user.id, date: today })
+      .select()
+      .single();
+    if (!session) return;
+    const records = Object.entries(attendanceMarks).map(([student_id, present]) => ({
+      session_id: session.id,
+      student_id,
+      course_id: selected.id,
+      present,
+    }));
+    await supabase.from("attendance_records").insert(records);
+    setTakingAttendance(false);
+    loadAttendance();
+    setMessage("Attendance saved!");
   };
 
   const loadData = async () => {
@@ -143,6 +214,13 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     }
     if (activeTab === "messages") {
       await loadDmStudents();
+    }
+    if (activeTab === "attendance") {
+      await loadAttendance();
+      if (students.length === 0) {
+        const { data: e } = await supabase.from("enrollments").select("*, profiles(*)").eq("course_id", selected.id);
+        setStudents((e || []).map((x) => x.profiles).filter(Boolean));
+      }
     }
   };
 
@@ -271,6 +349,21 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     />
   );
 
+  const ToastEl = msgToast ? (
+    <div style={{ position:"fixed", top:16, left:"50%", transform:"translateX(-50%)", width:"calc(100% - 32px)", maxWidth:440, background:"#1B4332", color:"#fff", borderRadius:16, padding:"14px 16px", zIndex:9999, boxShadow:"0 8px 24px rgba(0,0,0,0.35)", display:"flex", alignItems:"center", gap:12 }}>
+      <div style={{ width:40, height:40, background:"rgba(255,255,255,0.15)", borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        <Ic n="msg" s={20} c="#fff" />
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontWeight:700, fontSize:13 }}>Message from {msgToast.name}</div>
+        <div style={{ fontSize:12, opacity:0.8, marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{msgToast.body || "Sent you a message"}</div>
+      </div>
+      <button onClick={() => setMsgToast(null)} style={{ background:"none", border:"none", cursor:"pointer", padding:4, flexShrink:0 }}>
+        <Ic n="x" s={20} c="#fff" />
+      </button>
+    </div>
+  ) : null;
+
   const NAV = [
     { id: "home", icon: "home", label: "Home" },
     { id: "courses", icon: "book", label: "Courses" },
@@ -315,6 +408,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
           </Card>
         ))}
       </div>
+      {ToastEl}
     </div>
   );
 
@@ -328,7 +422,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
       </div>
       <div style={{ padding: "20px", paddingBottom: 40 }}>
         <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
-          {[["materials","file","Materials"],["assignments","clip","Tasks"],["quizzes","chart","Quizzes"],["grades","user","Grades"],["timetable","calendar","Timetable"],["discussion","send","Forum"],["messages","msg","Messages"]].map(([t, icon, label]) => (
+          {[["materials","file","Materials"],["assignments","clip","Tasks"],["quizzes","chart","Quizzes"],["grades","user","Grades"],["timetable","calendar","Timetable"],["attendance","users","Attend"],["discussion","send","Forum"],["messages","msg","Messages"]].map(([t, icon, label]) => (
             <button key={t} onClick={() => { setActiveTab(t); setShowForm(false); setMessage(""); setError(""); }}
               style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "8px 14px", borderRadius: 12, border: "none", background: activeTab === t ? C.primary : C.card, cursor: "pointer", flexShrink: 0, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
               <Ic n={icon} s={16} c={activeTab === t ? "#fff" : C.muted} />
@@ -505,7 +599,60 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             </div>
           )
         )}
+
+        {activeTab === "attendance" && (
+          <div>
+            {!takingAttendance ? (
+              <div>
+                <button onClick={startAttendance} style={{ display:"flex", alignItems:"center", gap:8, background:C.success, color:"#fff", border:"none", borderRadius:12, padding:"12px 20px", fontWeight:700, cursor:"pointer", marginBottom:16, fontFamily:"Inter,sans-serif" }}>
+                  <Ic n="check" s={18} c="#fff" w={2.5} />Take Attendance
+                </button>
+                {attendanceSessions.length === 0 && (
+                  <div style={{ textAlign:"center", color:C.muted, padding:"40px 0" }}>
+                    <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
+                    <div style={{ fontWeight:700, color:C.text, marginBottom:6 }}>No sessions yet</div>
+                    <div style={{ fontSize:13 }}>Tap "Take Attendance" to record today's class.</div>
+                  </div>
+                )}
+                {attendanceSessions.map(session => (
+                  <Card C={C} key={session.id} style={{ padding:16, marginBottom:10 }}>
+                    <div style={{ fontWeight:700, fontSize:14, color:C.text, marginBottom:8 }}>{session.date}</div>
+                    <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                      <Badge text={`${(session.attendance_records||[]).filter(r=>r.present).length} present`} bg="#D1FAE5" color="#065F46" />
+                      <Badge text={`${(session.attendance_records||[]).filter(r=>!r.present).length} absent`} bg="#FEE2E2" color="#EF4444" />
+                      <Badge text={`${(session.attendance_records||[]).length} total`} bg={C.bg} color={C.muted} />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontWeight:700, fontSize:15, color:C.text, marginBottom:4 }}>Mark Attendance</div>
+                <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>Tap the toggle to mark a student absent. All students start as present.</div>
+                {students.length === 0 && <div style={{ textAlign:"center", color:C.muted, padding:"40px 0" }}>No students enrolled.</div>}
+                {students.filter(Boolean).map(s => (
+                  <Card C={C} key={s.id} style={{ padding:14, marginBottom:8, display:"flex", alignItems:"center", gap:12 }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:600, fontSize:13, color:C.text }}>{s.name}</div>
+                      <div style={{ fontSize:11, color:C.muted }}>Matric: {s.matric}</div>
+                    </div>
+                    <div
+                      onClick={() => setAttendanceMarks(m => ({...m, [s.id]: !m[s.id]}))}
+                      style={{ width:32, height:32, borderRadius:10, background:attendanceMarks[s.id]?"#10B981":"transparent", border:`2px solid ${attendanceMarks[s.id]?"#10B981":"#EF4444"}`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
+                      {attendanceMarks[s.id] ? <Ic n="check" s={16} c="#fff" w={2.5} /> : <Ic n="x" s={14} c="#EF4444" />}
+                    </div>
+                  </Card>
+                ))}
+                <div style={{ display:"flex", gap:10, marginTop:20 }}>
+                  <button onClick={() => setTakingAttendance(false)} style={{ flex:1, background:C.card, color:C.muted, border:`1px solid ${C.border}`, borderRadius:12, padding:"13px 0", fontWeight:700, cursor:"pointer", fontFamily:"Inter,sans-serif" }}>Cancel</button>
+                  <button onClick={saveAttendance} style={{ flex:2, background:C.success, color:"#fff", border:"none", borderRadius:12, padding:"13px 0", fontWeight:700, cursor:"pointer", fontFamily:"Inter,sans-serif" }}>Save Attendance</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      {ToastEl}
     </div>
   );
 
@@ -651,12 +798,17 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
       <nav style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:480, background:C.navBg, backdropFilter:"blur(10px)", borderTop:`1px solid ${C.border}`, display:"flex", padding:"8px 0", zIndex:100 }}>
         {NAV.map((t)=>{
           const active=tab===t.id;
+          const showBadge = t.id === "more" && globalUnread > 0;
           return <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4, background:"none", border:"none", cursor:"pointer", padding:"4px 0" }}>
-            <div style={{ width:36, height:36, borderRadius:10, background:active?C.primary+"18":"transparent", display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n={t.icon} s={22} c={active?C.primary:C.muted} w={active?2.2:1.6}/></div>
+            <div style={{ width:36, height:36, borderRadius:10, background:active?C.primary+"18":"transparent", display:"flex", alignItems:"center", justifyContent:"center", position:"relative" }}>
+              <Ic n={t.icon} s={22} c={active?C.primary:C.muted} w={active?2.2:1.6}/>
+              {showBadge && <div style={{ position:"absolute", top:0, right:0, width:16, height:16, borderRadius:"50%", background:"#EF4444", display:"flex", alignItems:"center", justifyContent:"center" }}><span style={{ fontSize:9, fontWeight:800, color:"#fff" }}>{globalUnread > 9 ? "9+" : globalUnread}</span></div>}
+            </div>
             <span style={{ fontSize:10, fontWeight:active?700:500, color:active?C.primary:C.muted }}>{t.label}</span>
           </button>;
         })}
       </nav>
+      {ToastEl}
     </div>
   );
 }
