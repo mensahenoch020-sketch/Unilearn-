@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabase.js";
+import { playNotif } from "../utils/sound.js";
 import Ic from "./Ic.jsx";
 
 export default function DirectMessage({ course, user, C, otherUserId, otherUserName }) {
@@ -7,6 +8,7 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
+  const prevCountRef = useRef(0);
 
   useEffect(() => {
     if (!otherUserId) return;
@@ -18,7 +20,13 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
         schema: "public",
         table: "direct_messages",
         filter: `course_id=eq.${course.id}`,
-      }, () => loadMessages())
+      }, (payload) => {
+        // Play sound only for incoming messages from the other person
+        if (payload.new?.sender_id === otherUserId) {
+          playNotif();
+        }
+        loadMessages();
+      })
       .on("postgres_changes", {
         event: "UPDATE",
         schema: "public",
@@ -37,13 +45,13 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
       .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
       .order("created_at");
     setMessages(data || []);
+    prevCountRef.current = (data || []).length;
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 60);
-    // Mark all unread incoming messages as read
+    // Mark unread incoming messages as read
     const unread = (data || []).filter(m => m.sender_id !== user.id && !m.read_at);
     if (unread.length > 0) {
-      const now = new Date().toISOString();
       supabase.from("direct_messages")
-        .update({ read_at: now })
+        .update({ read_at: new Date().toISOString() })
         .in("id", unread.map(m => m.id))
         .then(() => {});
     }
@@ -98,19 +106,15 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
               }}>
                 {m.body}
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3 }}>
-                  <span style={{ opacity: 0.7 }}>
-                    {new Date(m.created_at).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
+                  <span>{new Date(m.created_at).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}</span>
                   {mine && (
                     <span style={{ display: "inline-flex", alignItems: "center" }}>
                       {isRead ? (
-                        /* Double blue ticks — read */
                         <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
                           <path d="M1 5L4.5 8.5L10 2" stroke="#60C0FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                           <path d="M5 5L8.5 8.5L14 2" stroke="#60C0FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       ) : (
-                        /* Single grey tick — delivered */
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                           <path d="M1 5L4 8L9 2" stroke="rgba(255,255,255,0.55)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
