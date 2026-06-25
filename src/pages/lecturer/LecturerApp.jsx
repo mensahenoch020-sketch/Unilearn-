@@ -12,13 +12,26 @@ import LecturerCourseEnrollment from "./LecturerCourseEnrollment.jsx";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
-function Card({ children, style = {}, C }) {
+function Card({ children, style = {}, C, onClick }) {
   return (
-    <div style={{ background: C.card, borderRadius: 16, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }}>
+    <div onClick={onClick} style={{ background: C.card, borderRadius: 16, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", ...style }}>
       {children}
     </div>
   );
 }
+
+const playNotif = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = "sine"; o.frequency.value = 820;
+    g.gain.setValueAtTime(0.25, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.35);
+  } catch (_) {}
+};
 
 export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout }) {
   const [tab, setTab] = useState("home");
@@ -67,6 +80,26 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   useEffect(() => { loadCourses(); loadAnnouncements(); }, []);
   useEffect(() => { if (selected) loadData(); }, [selected, activeTab]);
 
+  // Real-time listener for new incoming messages — plays sound and refreshes student list
+  useEffect(() => {
+    if (!selected || activeTab !== "messages") return;
+    const ch = supabase
+      .channel(`lec_dm_${selected.id}_${user.id}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "direct_messages",
+        filter: `course_id=eq.${selected.id}`,
+      }, (payload) => {
+        if (payload.new?.receiver_id === user.id) {
+          playNotif();
+          loadDmStudents();
+        }
+      })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [selected?.id, activeTab]);
+
   const loadCourses = async () => {
     const { data: lc } = await supabase
       .from("lecturer_courses")
@@ -107,6 +140,9 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     if (activeTab === "timetable") {
       const { data } = await supabase.from("timetable").select("*").eq("course_id", selected.id).order("day");
       setTimetableSlots(data || []);
+    }
+    if (activeTab === "messages") {
+      await loadDmStudents();
     }
   };
 
@@ -440,14 +476,21 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             </div>
           ) : (
             <div>
-              <button onClick={loadDmStudents} style={{ display: "flex", alignItems: "center", gap: 8, background: C.primary, color: "#fff", border: "none", borderRadius: 12, padding: "10px 16px", fontWeight: 700, cursor: "pointer", marginBottom: 16, fontSize: 13, fontFamily: "Inter,sans-serif" }}>
-                <Ic n="msg" s={15} c="#fff" /> Load Messages
-              </button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>Student Messages</div>
+                <button onClick={loadDmStudents} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: C.muted, cursor: "pointer", fontFamily: "Inter,sans-serif" }}>
+                  Refresh
+                </button>
+              </div>
               {dmStudents.length === 0 ? (
-                <div style={{ textAlign: "center", color: C.muted, padding: "40px 0", fontSize: 13 }}>No students have messaged you yet for this course.</div>
+                <div style={{ textAlign: "center", color: C.muted, padding: "60px 0" }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>💬</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 6 }}>No messages yet</div>
+                  <div style={{ fontSize: 13 }}>Students who message you will appear here.</div>
+                </div>
               ) : (
                 dmStudents.map(s => (
-                  <Card C={C} key={s.id} style={{ padding: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => setDmStudent(s)}>
+                  <Card C={C} key={s.id} onClick={() => setDmStudent(s)} style={{ padding: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
                     <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.primary + "20", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <Ic n="user" s={18} c={C.primary} />
                     </div>
