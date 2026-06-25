@@ -10,6 +10,9 @@ import Timetable from "./Timetable.jsx";
 import Attendance from "./Attendance.jsx";
 import Settings from "./Settings.jsx";
 import More from "./More.jsx";
+import Notifications from "./Notifications.jsx";
+import MessagesInbox from "./MessagesInbox.jsx";
+import AppGuide from "./AppGuide.jsx";
 
 const NAV = [
   { path: "/", icon: "home", label: "Home" },
@@ -25,20 +28,44 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
   const { pathname } = useLocation();
   const [callType, setCallType] = useState(null);
   const [deadlineCount, setDeadlineCount] = useState(0);
+  const [notifCount, setNotifCount] = useState(0);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchCounts = async () => {
       const { data: enr } = await supabase.from("enrollments").select("course_id").eq("student_id", user.id);
-      if (!enr || enr.length === 0) return;
-      const ids = enr.map(e => e.course_id);
-      const { data: asgn } = await supabase.from("assignments").select("due_date").in("course_id", ids);
-      const count = (asgn || []).filter(a => {
-        const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
-        return days >= 0 && days <= 3;
-      }).length;
-      setDeadlineCount(count);
+      const ids = (enr || []).map(e => e.course_id);
+
+      // Deadline badge on Home
+      if (ids.length > 0) {
+        const { data: asgn } = await supabase.from("assignments").select("due_date").in("course_id", ids);
+        const count = (asgn || []).filter(a => {
+          const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
+          return days >= 0 && days <= 3;
+        }).length;
+        setDeadlineCount(count);
+      }
+
+      // Notification badge on More (unread DMs + new announcements in last 24h)
+      const { count: dmCount } = await supabase
+        .from("direct_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("receiver_id", user.id)
+        .is("read_at", null);
+
+      let annCount = 0;
+      if (ids.length > 0) {
+        const since = new Date(Date.now() - 86400000).toISOString();
+        const { count } = await supabase
+          .from("announcements")
+          .select("id", { count: "exact", head: true })
+          .in("course_id", ids)
+          .gte("created_at", since);
+        annCount = count || 0;
+      }
+
+      setNotifCount((dmCount || 0) + annCount);
     };
-    fetch();
+    fetchCounts();
   }, [user.id]);
 
   if (callType) return <CallScreen callType={callType} onClose={() => setCallType(null)} />;
@@ -115,6 +142,9 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
           <Route path="/attendance" element={<Attendance user={user} C={C} />} />
           <Route path="/settings" element={<Settings user={user} setUser={setUser} C={C} onLogout={handleLogout} />} />
           <Route path="/more" element={<More user={user} dark={dark} setDark={setDark} onLogout={handleLogout} C={C} />} />
+          <Route path="/notifications" element={<Notifications user={user} C={C} />} />
+          <Route path="/messages-inbox" element={<MessagesInbox user={user} C={C} />} />
+          <Route path="/app-guide" element={<AppGuide C={C} />} />
           <Route path="*" element={<Dashboard user={user} C={C} />} />
         </Routes>
       </div>
@@ -139,7 +169,8 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
         >
           {NAV.map((t) => {
             const active = pathname === t.path;
-            const showBadge = t.path === "/" && deadlineCount > 0;
+            const showBadge = (t.path === "/" && deadlineCount > 0) || (t.path === "/more" && notifCount > 0);
+            const badgeCount = t.path === "/" ? deadlineCount : notifCount;
             return (
               <button
                 key={t.path}
@@ -177,7 +208,7 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
                       width: 16, height: 16, fontSize: 9, fontWeight: 800,
                       color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
-                      {deadlineCount > 9 ? "9+" : deadlineCount}
+                      {badgeCount > 9 ? "9+" : badgeCount}
                     </div>
                   )}
                 </div>

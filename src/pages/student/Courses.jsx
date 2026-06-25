@@ -756,7 +756,18 @@ export default function Courses({ user, C, onCall }) {
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-              <Badge text={`${c.units}u`} bg={(c.color || "#1B4332") + "18"} color={c.color || "#1B4332"} />
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Badge text={`${c.units}u`} bg={(c.color || "#1B4332") + "18"} color={c.color || "#1B4332"} />
+                {lecturerMap[c.id] && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelected(c); setActiveTab("messages"); setConfirmDropId(null); }}
+                    title={`Message ${lecturerMap[c.id].name}`}
+                    style={{ background: C.primary, border: "none", borderRadius: 8, padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}
+                  >
+                    <Ic n="msg" s={14} c="#fff" />
+                  </button>
+                )}
+              </div>
               {confirmDropId === c.id ? (
                 <div style={{ display: "flex", gap: 6 }}>
                   <button

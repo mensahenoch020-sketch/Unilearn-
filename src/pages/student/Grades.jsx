@@ -96,6 +96,24 @@ export default function Grades({ user, C }) {
           overflow: "hidden",
         }}
       >
+        <button
+          onClick={() => {
+            const style = document.createElement("style");
+            style.id = "__print_grades";
+            style.textContent = `@media print { body > div > div > div:first-child { display:none !important; } nav { display:none !important; } button { display:none !important; } }`;
+            document.head.appendChild(style);
+            window.print();
+            setTimeout(() => document.getElementById("__print_grades")?.remove(), 1500);
+          }}
+          style={{
+            position: "absolute", top: 16, right: 16,
+            background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 10,
+            padding: "6px 12px", color: "#fff", fontSize: 12, fontWeight: 700,
+            cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+          }}
+        >
+          ⬇ PDF
+        </button>
         <div
           style={{
             position: "absolute",

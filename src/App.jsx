@@ -8,6 +8,7 @@ import CourseEnrollment from "./pages/CourseEnrollment.jsx";
 import StudentApp from "./pages/student/StudentApp.jsx";
 import LecturerApp from "./pages/lecturer/LecturerApp.jsx";
 import LecturerCourseEnrollment from "./pages/lecturer/LecturerCourseEnrollment.jsx";
+import Onboarding from "./pages/student/Onboarding.jsx";
 
 function SplashScreen() {
   const [slow, setSlow] = useState(false);
@@ -72,6 +73,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [showEnrollment, setShowEnrollment] = useState(false);
   const [showLecturerEnrollment, setShowLecturerEnrollment] = useState(false);
+  const [onboarded, setOnboarded] = useState(() => localStorage.getItem("unilearn-onboarded") === "true");
 
   const C = dark ? DARK : LIGHT;
 
@@ -205,6 +207,14 @@ export default function App() {
 
   if (showEnrollment) {
     return <CourseEnrollment user={user} onDone={() => setShowEnrollment(false)} />;
+  }
+
+  if (!onboarded) {
+    return (
+      <BrowserRouter>
+        <Onboarding onDone={() => { localStorage.setItem("unilearn-onboarded", "true"); setOnboarded(true); }} />
+      </BrowserRouter>
+    );
   }
 
   return (
