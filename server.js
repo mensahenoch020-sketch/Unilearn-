@@ -40,34 +40,33 @@ return res.status(400).json({ error: "Password must be at least 6 characters." }
 }
 
 try {
-const { data, error } = await supabase.auth.admin.createUser({
-email: email.toLowerCase().trim(),
-password,
-email_confirm: true,
-user_metadata: { name: name.trim(), role },
-});
+  const { data, error } = await supabase.auth.admin.createUser({
+    email: email.toLowerCase().trim(),
+    password,
+    email_confirm: true,
+    user_metadata: { name: name.trim(), role },
+  });
 
-```
-if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: error.message });
 
-await supabase.from("profiles").upsert({
-  id: data.user.id,
-  name: name.trim(),
-  email: email.toLowerCase().trim(),
-  role,
-  faculty: faculty || null,
-  department: department || null,
-  level: role === "student" ? level : null,
-  semester: role === "student" ? semester : null,
-  matric: role === "student" ? (matric || null) : null,
-  staff_id: role === "lecturer" ? (staff_id || null) : null,
-});
+  await supabase.from("profiles").upsert({
+    id: data.user.id,
+    name: name.trim(),
+    email: email.toLowerCase().trim(),
+    role,
+    faculty: faculty || null,
+    department: department || null,
+    level: role === "student" ? level : null,
+    semester: role === "student" ? semester : null,
+    matric: role === "student" ? (matric || null) : null,
+    staff_id: role === "lecturer" ? (staff_id || null) : null,
+  });
 
-res.json({ success: true, userId: data.user.id });
-```
+  res.json({ success: true, userId: data.user.id });
 
 } catch (err) {
-res.status(500).json({ error: "An unexpected error occurred. Please try again." });
+  console.error("Signup error:", err);
+  res.status(500).json({ error: err?.message || "An unexpected error occurred. Please try again." });
 }
 });
 

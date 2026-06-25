@@ -18,7 +18,13 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
         schema: "public",
         table: "direct_messages",
         filter: `course_id=eq.${course.id}`,
-      }, loadMessages)
+      }, () => loadMessages())
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "direct_messages",
+        filter: `course_id=eq.${course.id}`,
+      }, () => loadMessages())
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [otherUserId, course.id]);
@@ -26,12 +32,21 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
   const loadMessages = async () => {
     const { data } = await supabase
       .from("direct_messages")
-      .select("id, sender_id, body, created_at")
+      .select("id, sender_id, body, created_at, read_at")
       .eq("course_id", course.id)
       .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
       .order("created_at");
     setMessages(data || []);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 60);
+    // Mark all unread incoming messages as read
+    const unread = (data || []).filter(m => m.sender_id !== user.id && !m.read_at);
+    if (unread.length > 0) {
+      const now = new Date().toISOString();
+      supabase.from("direct_messages")
+        .update({ read_at: now })
+        .in("id", unread.map(m => m.id))
+        .then(() => {});
+    }
   };
 
   const send = async () => {
@@ -68,6 +83,7 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
         )}
         {messages.map(m => {
           const mine = m.sender_id === user.id;
+          const isRead = !!m.read_at;
           return (
             <div key={m.id} style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start" }}>
               <div style={{
@@ -81,8 +97,26 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
                 lineHeight: 1.5,
               }}>
                 {m.body}
-                <div style={{ fontSize: 10, opacity: 0.55, marginTop: 4, textAlign: "right" }}>
-                  {new Date(m.created_at).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
+                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3 }}>
+                  <span style={{ opacity: 0.7 }}>
+                    {new Date(m.created_at).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  {mine && (
+                    <span style={{ display: "inline-flex", alignItems: "center" }}>
+                      {isRead ? (
+                        /* Double blue ticks — read */
+                        <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
+                          <path d="M1 5L4.5 8.5L10 2" stroke="#60C0FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M5 5L8.5 8.5L14 2" stroke="#60C0FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      ) : (
+                        /* Single grey tick — delivered */
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M1 5L4 8L9 2" stroke="rgba(255,255,255,0.55)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
