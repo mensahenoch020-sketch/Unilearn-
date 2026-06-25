@@ -5,10 +5,13 @@ export default function More({ user, dark, setDark, onLogout, C }) {
   const navigate = useNavigate();
 
   const items = [
-    { label: "Timetable", icon: "calendar", path: "/timetable", desc: "Weekly class schedule" },
-    { label: "Attendance", icon: "users", path: "/attendance", desc: "Track your attendance" },
-    { label: "Grades", icon: "chart", path: "/grades", desc: "Academic performance & CGPA" },
-    { label: "Settings", icon: "settings", path: "/settings", desc: "Profile, password & preferences" },
+    { label: "Notifications", icon: "bell", path: "/notifications", desc: "Messages, announcements & deadlines", color: "#F472B6" },
+    { label: "Messages", icon: "msg", path: "/messages-inbox", desc: "Direct chats with your lecturers", color: "#A78BFA" },
+    { label: "Timetable", icon: "calendar", path: "/timetable", desc: "Weekly class schedule", color: null },
+    { label: "Attendance", icon: "users", path: "/attendance", desc: "Track your attendance", color: null },
+    { label: "Grades", icon: "chart", path: "/grades", desc: "Academic performance & CGPA", color: null },
+    { label: "App Guide", icon: "book", path: "/app-guide", desc: "How to use UniLearn", color: "#34D399" },
+    { label: "Settings", icon: "settings", path: "/settings", desc: "Profile, password & preferences", color: null },
   ];
 
   return (
@@ -74,14 +77,14 @@ export default function More({ user, dark, setDark, onLogout, C }) {
             style={{
               width: 44,
               height: 44,
-              background: C.primary + "18",
+              background: (it.color || C.primary) + "18",
               borderRadius: 12,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <Ic n={it.icon} s={20} c={C.primary} />
+            <Ic n={it.icon} s={20} c={it.color || C.primary} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{it.label}</div>
