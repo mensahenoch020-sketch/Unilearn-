@@ -14,6 +14,7 @@ import More from "./More.jsx";
 import Notifications from "./Notifications.jsx";
 import MessagesInbox from "./MessagesInbox.jsx";
 import AppGuide from "./AppGuide.jsx";
+import AttendScan from "./AttendScan.jsx";
 
 const NAV = [
   { path: "/", icon: "home", label: "Home" },
@@ -93,6 +94,15 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
     return () => supabase.removeChannel(ch);
   }, [user.id]);
 
+  // After login, redirect to any pending attendance scan URL
+  useEffect(() => {
+    const redirect = sessionStorage.getItem("attend_redirect");
+    if (redirect) {
+      sessionStorage.removeItem("attend_redirect");
+      navigate(redirect);
+    }
+  }, []);
+
   if (callType) return <CallScreen callType={callType} onClose={() => setCallType(null)} />;
 
   const showBottomNav = BOTTOM_NAV_PATHS.includes(pathname);
@@ -148,6 +158,7 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
           <Route path="/notifications" element={<Notifications user={user} C={C} />} />
           <Route path="/messages-inbox" element={<MessagesInbox user={user} C={C} onRead={() => setDmCount(0)} />} />
           <Route path="/app-guide" element={<AppGuide C={C} />} />
+          <Route path="/attend/:sessionId" element={<AttendScan user={user} C={C} />} />
           <Route path="*" element={<Dashboard user={user} C={C} />} />
         </Routes>
       </div>
