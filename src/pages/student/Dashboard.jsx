@@ -52,7 +52,7 @@ export default function Dashboard({ user, C }) {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [user.id]);
 
   if (loading) return <Spinner />;
 
@@ -122,7 +122,7 @@ export default function Dashboard({ user, C }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>{a.title}</div>
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{a.courses?.code} · Due {a.due_date}</div>
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{a.courses?.code} · Due {new Date(a.due_date).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</div>
                 </div>
                 <Badge text={days === 0 ? "Today" : `${days}d`} bg={days <= 2 ? "#FEE2E2" : "#FEF3C7"} color={days <= 2 ? "#EF4444" : "#92400E"} />
               </div>

@@ -9,7 +9,7 @@ export default function MessagesInbox({ user, C }) {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [user.id]);
 
   const load = async () => {
     setLoading(true);

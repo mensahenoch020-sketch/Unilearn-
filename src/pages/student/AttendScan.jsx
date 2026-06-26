@@ -11,6 +11,8 @@ export default function AttendScan({ user, C }) {
 
   useEffect(() => {
     const mark = async () => {
+      if (!user?.id) { setStatus("error"); setDetail("Not logged in."); return; }
+
       // 1. Fetch session
       const { data: session, error: se } = await supabase
         .from("attendance_sessions")

@@ -22,7 +22,7 @@ export default function Grades({ user, C }) {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [user.id]);
 
   const calcTotal = (g) =>
     g.exam !== null ? (g.ca1 || 0) + (g.ca2 || 0) + (g.midterm || 0) + g.exam : null;

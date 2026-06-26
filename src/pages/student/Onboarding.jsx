@@ -59,7 +59,7 @@ export default function Onboarding({ onDone }) {
       {/* Skip */}
       <div style={{ display: "flex", justifyContent: "flex-end", padding: "20px 24px 0" }}>
         <button
-          onClick={onDone}
+          onClick={() => onDone?.()}
           style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 20, padding: "8px 18px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
         >
           Skip
@@ -123,7 +123,7 @@ export default function Onboarding({ onDone }) {
         {isLast ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <button
-              onClick={onDone}
+              onClick={() => onDone?.()}
               style={{
                 background: "#fff",
                 color: "#1B4332",
@@ -140,7 +140,7 @@ export default function Onboarding({ onDone }) {
               Get Started 🚀
             </button>
             <button
-              onClick={() => { onDone(); setTimeout(() => navigate("/app-guide"), 100); }}
+              onClick={() => { onDone?.(); setTimeout(() => navigate("/app-guide"), 100); }}
               style={{
                 background: "rgba(255,255,255,0.18)",
                 color: "#fff",

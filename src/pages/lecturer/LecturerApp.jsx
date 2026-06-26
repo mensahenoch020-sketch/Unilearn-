@@ -79,8 +79,9 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     ? user.faculty.toUpperCase()
     : user?.department?.toUpperCase() || "LECTURER";
 
-  useEffect(() => { loadCourses(); loadAnnouncements(); loadGlobalUnread(); loadGlobalConversations(); }, []);
+  useEffect(() => { loadCourses(); loadAnnouncements(); loadGlobalUnread(); loadGlobalConversations(); }, [user.id]);
   useEffect(() => { if (selected) loadData(); }, [selected, activeTab]);
+  useEffect(() => () => { clearInterval(qrIntervalRef.current); clearTimeout(toastTimerRef.current); }, []);
 
   // Global real-time listener — fires for ANY new DM sent to this lecturer
   useEffect(() => {
@@ -526,11 +527,14 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
               <button onClick={createAssignment} style={{ background: C.success, color: "#fff", border: "none", borderRadius: 12, padding: "12px 0", width: "100%", fontWeight: 700, cursor: "pointer", fontFamily: "Inter,sans-serif" }}>Create</button>
             </Card>}
             {assignments.map((a) => {
+              if (!a.due_date) return null;
               const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
+              if (!isFinite(days)) return null;
+              const dueFmt = new Date(a.due_date).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
               return <Card C={C} key={a.id} style={{ padding: 16, marginBottom: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 8 }}>{a.title}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                  <Badge text={`Due: ${a.due_date}`} bg={C.bg} color={C.muted} />
+                  <Badge text={`Due: ${dueFmt}`} bg={C.bg} color={C.muted} />
                   <Badge text={days < 0 ? "Overdue" : `${days}d left`} bg={days < 0 ? "#FEE2E2" : "#D1FAE5"} color={days < 0 ? "#EF4444" : "#065F46"} />
                   <Badge text={`${a.max_score} marks`} bg="#EFF6FF" color="#3B82F6" />
                 </div>
@@ -849,8 +853,8 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
                 <div style={{ fontSize:13 }}>When students message you, they'll appear here.</div>
               </div>
             ) : (
-              globalConversations.map((convo, i) => (
-                <div key={i} onClick={() => {
+              globalConversations.map((convo) => (
+                <div key={`${convo.course_id}_${convo.sender_id}`} onClick={() => {
                   const course = courses.find(c => c.id === convo.course_id);
                   if (course) { setSelected(course); setActiveTab("messages"); setDmStudent(convo.sender); setTab("home"); }
                 }}
