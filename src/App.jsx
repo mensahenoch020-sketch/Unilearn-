@@ -178,7 +178,12 @@ export default function App() {
   };
 
   if (loading) return <SplashScreen />;
-  if (!user) return <Auth onLogin={handleLogin} />;
+  if (!user) {
+    if (window.location.pathname.startsWith("/attend/")) {
+      sessionStorage.setItem("attend_redirect", window.location.pathname);
+    }
+    return <Auth onLogin={handleLogin} />;
+  }
 
   if (user.role === "lecturer") {
     if (showLecturerEnrollment) {

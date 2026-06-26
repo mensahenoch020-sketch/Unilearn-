@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../../supabase.js";
+import QRCode from "qrcode";
 import { validateFile } from "../../utils/grades.js";
 import { playNotif } from "../../utils/sound.js";
 import { ALLOWED_MATERIAL_TYPES, MAX_FILE_SIZE_MB } from "../../data.js";
@@ -10,6 +11,7 @@ import CallScreen from "../../components/CallScreen.jsx";
 import CourseDiscussion from "../../components/CourseDiscussion.jsx";
 import DirectMessage from "../../components/DirectMessage.jsx";
 import LecturerCourseEnrollment from "./LecturerCourseEnrollment.jsx";
+import PWAInstall from "../../components/PWAInstall.jsx";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
@@ -56,10 +58,15 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   const [ttForm, setTtForm] = useState({ day: "Monday", start_time: "08:00", end_time: "10:00", venue: "" });
   const [msgToast, setMsgToast] = useState(null);
   const [globalUnread, setGlobalUnread] = useState(0);
+  const [globalConversations, setGlobalConversations] = useState([]);
   const [attendanceSessions, setAttendanceSessions] = useState([]);
   const [takingAttendance, setTakingAttendance] = useState(false);
   const [attendanceMarks, setAttendanceMarks] = useState({});
+  const [showQR, setShowQR] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [qrTimeLeft, setQrTimeLeft] = useState(0);
   const toastTimerRef = useRef(null);
+  const qrIntervalRef = useRef(null);
 
   const inp = {
     width: "100%", border: `1.5px solid ${C.border}`, borderRadius: 12,
@@ -72,7 +79,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     ? user.faculty.toUpperCase()
     : user?.department?.toUpperCase() || "LECTURER";
 
-  useEffect(() => { loadCourses(); loadAnnouncements(); loadGlobalUnread(); }, []);
+  useEffect(() => { loadCourses(); loadAnnouncements(); loadGlobalUnread(); loadGlobalConversations(); }, []);
   useEffect(() => { if (selected) loadData(); }, [selected, activeTab]);
 
   // Global real-time listener — fires for ANY new DM sent to this lecturer
@@ -97,7 +104,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
         clearTimeout(toastTimerRef.current);
         setMsgToast({ name: sender?.name || "Student", body: preview, courseId: payload.new.course_id });
         toastTimerRef.current = setTimeout(() => setMsgToast(null), 5000);
-        // If currently viewing this course's messages tab, refresh
+        loadGlobalConversations();
         if (selected?.id === payload.new.course_id && activeTab === "messages") {
           loadDmStudents();
         }
@@ -149,6 +156,51 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
       .eq("receiver_id", user.id)
       .is("read_at", null);
     setGlobalUnread(count || 0);
+  };
+
+  const loadGlobalConversations = async () => {
+    const { data } = await supabase
+      .from("direct_messages")
+      .select("sender_id, course_id, body, created_at, read_at")
+      .eq("receiver_id", user.id)
+      .order("created_at", { ascending: false });
+    if (!data || data.length === 0) { setGlobalConversations([]); return; }
+    const seen = new Set();
+    const unique = [];
+    for (const msg of data) {
+      const key = `${msg.course_id}_${msg.sender_id}`;
+      if (!seen.has(key)) { seen.add(key); unique.push(msg); }
+    }
+    const senderIds = [...new Set(unique.map(m => m.sender_id))];
+    const courseIds = [...new Set(unique.map(m => m.course_id))];
+    const [{ data: profs }, { data: coursesData }] = await Promise.all([
+      supabase.from("profiles").select("id, name, matric").in("id", senderIds),
+      supabase.from("courses").select("id, code, title").in("id", courseIds),
+    ]);
+    const pm = {}; (profs || []).forEach(p => pm[p.id] = p);
+    const cm = {}; (coursesData || []).forEach(c => cm[c.id] = c);
+    setGlobalConversations(unique.map(m => ({ ...m, sender: pm[m.sender_id], course: cm[m.course_id] })));
+  };
+
+  const generateQR = async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const { data: session } = await supabase
+      .from("attendance_sessions")
+      .insert({ course_id: selected.id, lecturer_id: user.id, date: today })
+      .select().single();
+    if (!session) { setError("Failed to create attendance session."); return; }
+    const url = `${window.location.origin}/attend/${session.id}`;
+    const dataUrl = await QRCode.toDataURL(url, { width: 280, margin: 2, color: { dark: "#1B4332", light: "#ffffff" } });
+    setQrDataUrl(dataUrl);
+    setShowQR(true);
+    setQrTimeLeft(1800);
+    clearInterval(qrIntervalRef.current);
+    qrIntervalRef.current = setInterval(() => {
+      setQrTimeLeft(t => {
+        if (t <= 1) { clearInterval(qrIntervalRef.current); setShowQR(false); setQrDataUrl(null); loadAttendance(); return 0; }
+        return t - 1;
+      });
+    }, 1000);
   };
 
   const loadAttendance = async () => {
@@ -364,10 +416,16 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     </div>
   ) : null;
 
+  const timeAgo = (ts) => {
+    const d = Math.floor((Date.now() - new Date(ts)) / 60000);
+    if (d < 1) return "now"; if (d < 60) return `${d}m`; if (d < 1440) return `${Math.floor(d/60)}h`; return `${Math.floor(d/1440)}d`;
+  };
+
   const NAV = [
     { id: "home", icon: "home", label: "Home" },
     { id: "courses", icon: "book", label: "Courses" },
     { id: "announce", icon: "bell", label: "Notices" },
+    { id: "messages", icon: "msg", label: "Messages" },
     { id: "more", icon: "more", label: "More" },
   ];
 
@@ -604,9 +662,14 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
           <div>
             {!takingAttendance ? (
               <div>
-                <button onClick={startAttendance} style={{ display:"flex", alignItems:"center", gap:8, background:C.success, color:"#fff", border:"none", borderRadius:12, padding:"12px 20px", fontWeight:700, cursor:"pointer", marginBottom:16, fontFamily:"Inter,sans-serif" }}>
-                  <Ic n="check" s={18} c="#fff" w={2.5} />Take Attendance
-                </button>
+                <div style={{ display:"flex", gap:10, marginBottom:16 }}>
+                  <button onClick={startAttendance} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8, background:C.success, color:"#fff", border:"none", borderRadius:12, padding:"12px 10px", fontWeight:700, cursor:"pointer", fontFamily:"Inter,sans-serif" }}>
+                    <Ic n="check" s={16} c="#fff" w={2.5} />Manual
+                  </button>
+                  <button onClick={generateQR} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8, background:C.info, color:"#fff", border:"none", borderRadius:12, padding:"12px 10px", fontWeight:700, cursor:"pointer", fontFamily:"Inter,sans-serif" }}>
+                    <Ic n="qr" s={16} c="#fff" />QR Code
+                  </button>
+                </div>
                 {attendanceSessions.length === 0 && (
                   <div style={{ textAlign:"center", color:C.muted, padding:"40px 0" }}>
                     <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
@@ -653,6 +716,23 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
         )}
       </div>
       {ToastEl}
+      {showQR && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", zIndex:9998, padding:24 }}>
+          <div style={{ background:"#fff", borderRadius:24, padding:28, textAlign:"center", maxWidth:320, width:"100%" }}>
+            <div style={{ fontWeight:800, fontSize:18, color:"#1B4332", marginBottom:4 }}>Scan to Mark Attendance</div>
+            <div style={{ fontSize:12, color:"#6B6B6B", marginBottom:20 }}>Students: open your phone camera and scan this code</div>
+            {qrDataUrl && <img src={qrDataUrl} alt="QR" style={{ width:240, height:240, display:"block", margin:"0 auto 20px", borderRadius:12 }} />}
+            <div style={{ fontWeight:800, fontSize:28, color:"#1B4332", letterSpacing:-1 }}>
+              {Math.floor(qrTimeLeft/60)}:{String(qrTimeLeft%60).padStart(2,"0")}
+            </div>
+            <div style={{ fontSize:12, color:"#6B6B6B", marginBottom:24 }}>minutes remaining</div>
+            <button onClick={() => { clearInterval(qrIntervalRef.current); setShowQR(false); setQrDataUrl(null); loadAttendance(); }}
+              style={{ background:"#1B4332", color:"#fff", border:"none", borderRadius:12, padding:"14px 0", width:"100%", fontWeight:700, fontSize:15, cursor:"pointer", fontFamily:"Inter,sans-serif" }}>
+              Close QR Code
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -759,6 +839,40 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
           </div>
         )}
 
+        {tab === "messages" && (
+          <div>
+            <div style={{ fontSize:22, fontWeight:800, marginBottom:20, color:C.text, letterSpacing:-0.5 }}>Messages</div>
+            {globalConversations.length === 0 ? (
+              <div style={{ textAlign:"center", padding:"60px 0", color:C.muted }}>
+                <div style={{ fontSize:40, marginBottom:12 }}>💬</div>
+                <div style={{ fontWeight:700, fontSize:15, color:C.text, marginBottom:6 }}>No messages yet</div>
+                <div style={{ fontSize:13 }}>When students message you, they'll appear here.</div>
+              </div>
+            ) : (
+              globalConversations.map((convo, i) => (
+                <div key={i} onClick={() => {
+                  const course = courses.find(c => c.id === convo.course_id);
+                  if (course) { setSelected(course); setActiveTab("messages"); setDmStudent(convo.sender); setTab("home"); }
+                }}
+                style={{ background:C.card, borderRadius:16, padding:14, marginBottom:10, border:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:12, cursor:"pointer", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
+                  <div style={{ width:44, height:44, borderRadius:"50%", background:C.primary+"20", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <Ic n="user" s={20} c={C.primary} />
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:2 }}>
+                      <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{convo.sender?.name || "Student"}</div>
+                      <div style={{ fontSize:11, color:C.muted }}>{timeAgo(convo.created_at)}</div>
+                    </div>
+                    <div style={{ fontSize:11, color:C.primary, fontWeight:600, marginBottom:2 }}>{convo.course?.code}</div>
+                    <div style={{ fontSize:12, color:C.muted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{convo.body}</div>
+                  </div>
+                  {!convo.read_at && <div style={{ width:8, height:8, borderRadius:"50%", background:"#EF4444", flexShrink:0 }} />}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {tab === "more" && (
           <div>
             <Card C={C} style={{ padding:20, marginBottom:16, textAlign:"center" }}>
@@ -798,8 +912,8 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
       <nav style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:480, background:C.navBg, backdropFilter:"blur(10px)", borderTop:`1px solid ${C.border}`, display:"flex", padding:"8px 0", zIndex:100 }}>
         {NAV.map((t)=>{
           const active=tab===t.id;
-          const showBadge = t.id === "more" && globalUnread > 0;
-          return <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4, background:"none", border:"none", cursor:"pointer", padding:"4px 0" }}>
+          const showBadge = t.id === "messages" && globalUnread > 0;
+          return <button key={t.id} onClick={()=>{ setTab(t.id); if(t.id==="messages"){ setGlobalUnread(0); loadGlobalConversations(); } }} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4, background:"none", border:"none", cursor:"pointer", padding:"4px 0" }}>
             <div style={{ width:36, height:36, borderRadius:10, background:active?C.primary+"18":"transparent", display:"flex", alignItems:"center", justifyContent:"center", position:"relative" }}>
               <Ic n={t.icon} s={22} c={active?C.primary:C.muted} w={active?2.2:1.6}/>
               {showBadge && <div style={{ position:"absolute", top:0, right:0, width:16, height:16, borderRadius:"50%", background:"#EF4444", display:"flex", alignItems:"center", justifyContent:"center" }}><span style={{ fontSize:9, fontWeight:800, color:"#fff" }}>{globalUnread > 9 ? "9+" : globalUnread}</span></div>}
@@ -809,6 +923,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
         })}
       </nav>
       {ToastEl}
+      <PWAInstall C={C} />
     </div>
   );
 }
