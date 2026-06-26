@@ -15,6 +15,7 @@ import Notifications from "./Notifications.jsx";
 import MessagesInbox from "./MessagesInbox.jsx";
 import AppGuide from "./AppGuide.jsx";
 import AttendScan from "./AttendScan.jsx";
+import PWAInstall from "../../components/PWAInstall.jsx";
 
 const NAV = [
   { path: "/", icon: "home", label: "Home" },
@@ -162,6 +163,8 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
           <Route path="*" element={<Dashboard user={user} C={C} />} />
         </Routes>
       </div>
+
+      <PWAInstall C={C} />
 
       {/* Bottom nav */}
       {showBottomNav && (

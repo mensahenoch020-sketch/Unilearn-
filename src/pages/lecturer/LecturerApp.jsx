@@ -11,6 +11,7 @@ import CallScreen from "../../components/CallScreen.jsx";
 import CourseDiscussion from "../../components/CourseDiscussion.jsx";
 import DirectMessage from "../../components/DirectMessage.jsx";
 import LecturerCourseEnrollment from "./LecturerCourseEnrollment.jsx";
+import PWAInstall from "../../components/PWAInstall.jsx";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
@@ -922,6 +923,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
         })}
       </nav>
       {ToastEl}
+      <PWAInstall C={C} />
     </div>
   );
 }
