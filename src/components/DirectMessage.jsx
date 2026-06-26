@@ -8,7 +8,6 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
-  const prevCountRef = useRef(0);
 
   useEffect(() => {
     if (!otherUserId) return;
@@ -21,11 +20,21 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
         table: "direct_messages",
         filter: `course_id=eq.${course.id}`,
       }, (payload) => {
-        // Play sound only for incoming messages from the other person
-        if (payload.new?.sender_id === otherUserId) {
+        const msg = payload.new;
+        // Only handle incoming messages — own messages are added optimistically on send
+        if (msg?.sender_id !== user.id) {
           playNotif();
+          setMessages(prev => {
+            // Avoid duplicates (realtime can sometimes fire twice)
+            if (prev.some(m => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 40);
+          // Mark as read immediately
+          supabase.from("direct_messages")
+            .update({ read_at: new Date().toISOString() })
+            .eq("id", msg.id).then(() => {});
         }
-        loadMessages();
       })
       .on("postgres_changes", {
         event: "UPDATE",
@@ -45,7 +54,6 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
       .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
       .order("created_at");
     setMessages(data || []);
-    prevCountRef.current = (data || []).length;
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 60);
     // Mark unread incoming messages as read
     const unread = (data || []).filter(m => m.sender_id !== user.id && !m.read_at);
@@ -58,16 +66,40 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
   };
 
   const send = async () => {
-    if (!text.trim() || !otherUserId || sending) return;
+    const body = text.trim();
+    if (!body || !otherUserId || sending) return;
     setSending(true);
-    await supabase.from("direct_messages").insert({
+    setText(""); // Clear input immediately
+
+    // Optimistic update — show message right away without waiting for DB
+    const optimistic = {
+      id: `opt_${Date.now()}`,
       sender_id: user.id,
-      receiver_id: otherUserId,
-      course_id: course.id,
-      body: text.trim(),
-    });
-    setText("");
+      body,
+      created_at: new Date().toISOString(),
+      read_at: null,
+      _optimistic: true,
+    };
+    setMessages(prev => [...prev, optimistic]);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 40);
+
+    const { data: newMsg, error } = await supabase
+      .from("direct_messages")
+      .insert({ sender_id: user.id, receiver_id: otherUserId, course_id: course.id, body })
+      .select("id, sender_id, body, created_at, read_at")
+      .single();
+
     setSending(false);
+
+    if (error) {
+      // Revert optimistic message on failure
+      setMessages(prev => prev.filter(m => m.id !== optimistic.id));
+      setText(body);
+      return;
+    }
+
+    // Replace optimistic message with real one from DB
+    setMessages(prev => prev.map(m => m.id === optimistic.id ? newMsg : m));
   };
 
   if (!otherUserId) return (
@@ -92,6 +124,7 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
         {messages.map(m => {
           const mine = m.sender_id === user.id;
           const isRead = !!m.read_at;
+          const isOptimistic = !!m._optimistic;
           return (
             <div key={m.id} style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start" }}>
               <div style={{
@@ -103,6 +136,8 @@ export default function DirectMessage({ course, user, C, otherUserId, otherUserN
                 border: mine ? "none" : `1px solid ${C.border}`,
                 fontSize: 14,
                 lineHeight: 1.5,
+                opacity: isOptimistic ? 0.75 : 1,
+                transition: "opacity 0.2s",
               }}>
                 {m.body}
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3 }}>
