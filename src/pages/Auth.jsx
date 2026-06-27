@@ -104,44 +104,39 @@ export default function Auth({ onLogin }) {
     setLoading(true);
     setError("");
     setMessage("Creating your account…");
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 28000);
     try {
-      const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-          role,
-          matric: role === "student" ? matric : null,
-          staff_id: role === "lecturer" ? staffId : null,
-          faculty,
-          department,
-          level: role === "student" ? `${level} Level` : null,
-          semester: role === "student" ? semester : null,
-        }),
+      const { data, error: authErr } = await supabase.auth.signUp({
+        email: email.toLowerCase().trim(),
+        password,
+        options: { data: { name: name.trim(), role } },
       });
-      clearTimeout(timeoutId);
-      if (!res.ok) {
-        const result = await res.json().catch(() => ({}));
-        setError(result.error || "Server error. Please try again.");
-        setLoading(false);
-        return;
-      }
-      const result = await res.json();
-      if (result.error) { setError(result.error); setLoading(false); return; }
-      setMessage("Account created! You can now sign in.");
-      switchMode("login");
-    } catch (err) {
-      clearTimeout(timeoutId);
-      if (err.name === "AbortError") {
-        setError("This is taking too long — the server may be starting up. Please wait 30 seconds and try again.");
+      if (authErr) { setError(authErr.message); setLoading(false); return; }
+      if (!data.user) { setError("Signup failed. Please try again."); setLoading(false); return; }
+
+      // Write full profile — RLS policy allows this because signUp auto-authenticates
+      await supabase.from("profiles").upsert({
+        id: data.user.id,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        role,
+        faculty: faculty || null,
+        department: department || null,
+        level: role === "student" ? `${level} Level` : null,
+        semester: role === "student" ? semester : null,
+        matric: role === "student" ? (matric || null) : null,
+        staff_id: role === "lecturer" ? (staffId || null) : null,
+      });
+
+      // Fetch profile and log in directly — no need to go back to login screen
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+      if (profile) {
+        onLogin(profile);
       } else {
-        setError("Something went wrong. Please check your connection and try again.");
+        setMessage("Account created! Please sign in.");
+        switchMode("login");
       }
+    } catch {
+      setError("Something went wrong. Please check your connection and try again.");
     }
     setLoading(false);
   };
