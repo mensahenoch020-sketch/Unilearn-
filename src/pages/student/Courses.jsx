@@ -47,36 +47,41 @@ export default function Courses({ user, C, onCall }) {
   useEffect(() => { loadCourses(); }, []);
 
   const loadCourses = async () => {
-    const { data: enrollments } = await supabase
-      .from("enrollments")
-      .select("*, courses(*)")
-      .eq("student_id", user.id);
-    const enrolled = (enrollments || []).map((e) => e.courses).filter(Boolean);
-    setCourses(enrolled);
-    const { data: all } = await supabase.from("courses").select("*").order("code");
-    setAllCourses(all || []);
+    try {
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("*, courses(*)")
+        .eq("student_id", user.id);
+      const enrolled = (enrollments || []).map((e) => e.courses).filter(Boolean);
+      setCourses(enrolled);
+      const { data: all } = await supabase.from("courses").select("*").order("code");
+      setAllCourses(all || []);
 
-    // Fetch lecturers for all enrolled courses so cards can show the name
-    const ids = enrolled.map((c) => c.id);
-    if (ids.length > 0) {
-      const { data: lcs } = await supabase
-        .from("lecturer_courses")
-        .select("course_id, lecturer_id")
-        .in("course_id", ids);
-      if (lcs?.length) {
-        const uids = [...new Set(lcs.map((l) => l.lecturer_id))];
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, name, avatar_url")
-          .in("id", uids);
-        const profMap = {};
-        (profs || []).forEach((p) => { profMap[p.id] = p; });
-        const map = {};
-        lcs.forEach((lc) => { map[lc.course_id] = profMap[lc.lecturer_id] || null; });
-        setLecturerMap(map);
+      // Fetch lecturers for all enrolled courses so cards can show the name
+      const ids = enrolled.map((c) => c.id);
+      if (ids.length > 0) {
+        const { data: lcs } = await supabase
+          .from("lecturer_courses")
+          .select("course_id, lecturer_id")
+          .in("course_id", ids);
+        if (lcs?.length) {
+          const uids = [...new Set(lcs.map((l) => l.lecturer_id))];
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, name, avatar_url")
+            .in("id", uids);
+          const profMap = {};
+          (profs || []).forEach((p) => { profMap[p.id] = p; });
+          const map = {};
+          lcs.forEach((lc) => { map[lc.course_id] = profMap[lc.lecturer_id] || null; });
+          setLecturerMap(map);
+        }
       }
+    } catch {
+      // network/query error — show empty state rather than infinite spinner
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { if (selected) loadData(); }, [selected, activeTab]);
@@ -379,7 +384,7 @@ export default function Courses({ user, C, onCall }) {
 
   // ── QUIZ RESULT WITH ANSWER REVIEW ────────────────────
   if (quizResult) {
-    const pct = Math.round((quizResult.score / quizResult.total) * 100);
+    const pct = quizResult.total > 0 ? Math.round((quizResult.score / quizResult.total) * 100) : 0;
     const g = gradeOf(pct);
     const emoji = pct === 100 ? "🏆" : pct >= 70 ? "🎉" : pct >= 50 ? "👍" : "📚";
     return (
@@ -581,7 +586,9 @@ export default function Courses({ user, C, onCall }) {
         <div>
           {assignments.length === 0 && <div style={{ textAlign: "center", color: C.muted, padding: "40px 0" }}>No assignments posted yet.</div>}
           {assignments.map((a) => {
+            if (!a.due_date) return null;
             const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
+            if (!isFinite(days)) return null;
             const overdue = days < 0;
             const mySub = mySubmissions[a.id];
             return (
@@ -618,7 +625,7 @@ export default function Courses({ user, C, onCall }) {
           {quizzes.length === 0 && <div style={{ textAlign: "center", color: C.muted, padding: "40px 0" }}>No quizzes yet.</div>}
           {quizzes.map((q) => {
             const attempt = attempts.find((a) => a.quiz_id === q.id);
-            const pct = attempt ? Math.round((attempt.score / attempt.total) * 100) : null;
+            const pct = attempt && attempt.total > 0 ? Math.round((attempt.score / attempt.total) * 100) : null;
             const g = pct !== null ? gradeOf(pct) : null;
             return (
               <div key={q.id} style={{ background: C.card, borderRadius: 16, padding: 16, marginBottom: 12, border: `1px solid ${C.border}` }}>

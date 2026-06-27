@@ -40,14 +40,19 @@ export default function CourseDiscussion({ course, user, C, onCall }) {
   }, [course.id]);
 
   const loadPosts = async () => {
-    const { data } = await supabase
-      .from("forum_posts")
-      .select("*, profiles(name, role)")
-      .eq("course_id", course.id)
-      .is("parent_id", null)
-      .order("created_at", { ascending: false });
-    setPosts(data || []);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from("forum_posts")
+        .select("*, profiles(name, role)")
+        .eq("course_id", course.id)
+        .is("parent_id", null)
+        .order("created_at", { ascending: false });
+      setPosts(data || []);
+    } catch {
+      // network error — show empty state
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadReplies = async (postId) => {

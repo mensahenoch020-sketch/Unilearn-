@@ -10,25 +10,30 @@ export default function Attendance({ user, C }) {
 
   useEffect(() => {
     const load = async () => {
-      const { data: enr } = await supabase
-        .from("enrollments")
-        .select("*, courses(*)")
-        .eq("student_id", user.id);
-      const enrolled = (enr || []).map((e) => e.courses).filter(Boolean);
+      try {
+        const { data: enr } = await supabase
+          .from("enrollments")
+          .select("*, courses(*)")
+          .eq("student_id", user.id);
+        const enrolled = (enr || []).map((e) => e.courses).filter(Boolean);
 
-      const { data: s } = await supabase.from("attendance_sessions").select("*");
-      const { data: r } = await supabase
-        .from("attendance_records")
-        .select("*")
-        .eq("student_id", user.id);
+        const { data: s } = await supabase.from("attendance_sessions").select("*");
+        const { data: r } = await supabase
+          .from("attendance_records")
+          .select("*")
+          .eq("student_id", user.id);
 
-      setCourses(enrolled);
-      setSessions(s || []);
-      setRecords(r || []);
-      setLoading(false);
+        setCourses(enrolled);
+        setSessions(s || []);
+        setRecords(r || []);
+      } catch {
+        // network error — show empty state
+      } finally {
+        setLoading(false);
+      }
     };
     load();
-  }, []);
+  }, [user.id]);
 
   if (loading) return <Spinner />;
 

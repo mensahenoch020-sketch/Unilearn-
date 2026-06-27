@@ -11,15 +11,20 @@ export default function Grades({ user, C }) {
 
   useEffect(() => {
     const load = async () => {
-      const { data: g } = await supabase.from("grades").select("*").eq("student_id", user.id);
-      const { data: enr } = await supabase
-        .from("enrollments")
-        .select("*, courses(*)")
-        .eq("student_id", user.id);
-      const enrolled = (enr || []).map((e) => e.courses).filter(Boolean);
-      setGrades(g || []);
-      setCourses(enrolled);
-      setLoading(false);
+      try {
+        const { data: g } = await supabase.from("grades").select("*").eq("student_id", user.id);
+        const { data: enr } = await supabase
+          .from("enrollments")
+          .select("*, courses(*)")
+          .eq("student_id", user.id);
+        const enrolled = (enr || []).map((e) => e.courses).filter(Boolean);
+        setGrades(g || []);
+        setCourses(enrolled);
+      } catch {
+        // network/query error — show empty state rather than infinite spinner
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, [user.id]);
@@ -81,7 +86,7 @@ export default function Grades({ user, C }) {
         Academic Results
       </div>
       <div style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>
-        2024/2025 · {user?.semester || ""} Semester
+        {new Date().getFullYear()}/{new Date().getFullYear() + 1} · {user?.semester || ""} Semester
       </div>
 
       {/* CGPA Banner */}
