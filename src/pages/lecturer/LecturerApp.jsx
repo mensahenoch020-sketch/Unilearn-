@@ -323,7 +323,8 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
 
   const gradeSubmission = async (subId) => {
     if (!gradeSubForm.score) return setError("Enter a score.");
-    await supabase.from("submissions").update({ score: +gradeSubForm.score, feedback: gradeSubForm.feedback }).eq("id", subId);
+    const { error: ge } = await supabase.from("submissions").update({ score: +gradeSubForm.score, feedback: gradeSubForm.feedback }).eq("id", subId);
+    if (ge) { setError("Failed to save grade. Please try again."); return; }
     setMessage("Graded!"); setGradeSubForm({ score: "", feedback: "" }); loadSubmissions(selAssignment.id);
   };
 

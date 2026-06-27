@@ -384,7 +384,7 @@ export default function Courses({ user, C, onCall }) {
 
   // ── QUIZ RESULT WITH ANSWER REVIEW ────────────────────
   if (quizResult) {
-    const pct = Math.round((quizResult.score / quizResult.total) * 100);
+    const pct = quizResult.total > 0 ? Math.round((quizResult.score / quizResult.total) * 100) : 0;
     const g = gradeOf(pct);
     const emoji = pct === 100 ? "🏆" : pct >= 70 ? "🎉" : pct >= 50 ? "👍" : "📚";
     return (
@@ -586,7 +586,9 @@ export default function Courses({ user, C, onCall }) {
         <div>
           {assignments.length === 0 && <div style={{ textAlign: "center", color: C.muted, padding: "40px 0" }}>No assignments posted yet.</div>}
           {assignments.map((a) => {
+            if (!a.due_date) return null;
             const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
+            if (!isFinite(days)) return null;
             const overdue = days < 0;
             const mySub = mySubmissions[a.id];
             return (
@@ -623,7 +625,7 @@ export default function Courses({ user, C, onCall }) {
           {quizzes.length === 0 && <div style={{ textAlign: "center", color: C.muted, padding: "40px 0" }}>No quizzes yet.</div>}
           {quizzes.map((q) => {
             const attempt = attempts.find((a) => a.quiz_id === q.id);
-            const pct = attempt ? Math.round((attempt.score / attempt.total) * 100) : null;
+            const pct = attempt && attempt.total > 0 ? Math.round((attempt.score / attempt.total) * 100) : null;
             const g = pct !== null ? gradeOf(pct) : null;
             return (
               <div key={q.id} style={{ background: C.card, borderRadius: 16, padding: 16, marginBottom: 12, border: `1px solid ${C.border}` }}>

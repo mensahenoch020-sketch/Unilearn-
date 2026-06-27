@@ -86,7 +86,7 @@ export default function Grades({ user, C }) {
         Academic Results
       </div>
       <div style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>
-        2024/2025 · {user?.semester || ""} Semester
+        {new Date().getFullYear()}/{new Date().getFullYear() + 1} · {user?.semester || ""} Semester
       </div>
 
       {/* CGPA Banner */}

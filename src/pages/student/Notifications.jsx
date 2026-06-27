@@ -10,6 +10,7 @@ export default function Notifications({ user, C }) {
   useEffect(() => { load(); }, [user.id]);
 
   const load = async () => {
+    try {
     const all = [];
 
     // Unread DMs
@@ -93,7 +94,11 @@ export default function Notifications({ user, C }) {
 
     all.sort((a, b) => new Date(b.time) - new Date(a.time));
     setItems(all);
-    setLoading(false);
+    } catch {
+      // network error — show empty state
+    } finally {
+      setLoading(false);
+    }
   };
 
   const timeAgo = (t) => {

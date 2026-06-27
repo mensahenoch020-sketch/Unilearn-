@@ -13,23 +13,28 @@ export default function Timetable({ user, C }) {
 
   useEffect(() => {
     const load = async () => {
-      const { data: enr } = await supabase
-        .from("enrollments")
-        .select("course_id")
-        .eq("student_id", user.id);
-      const ids = (enr || []).map((e) => e.course_id);
-      if (ids.length > 0) {
-        const { data } = await supabase
-          .from("timetable")
-          .select("*, courses(code, title, color)")
-          .in("course_id", ids)
-          .order("start_time");
-        setSlots(data || []);
+      try {
+        const { data: enr } = await supabase
+          .from("enrollments")
+          .select("course_id")
+          .eq("student_id", user.id);
+        const ids = (enr || []).map((e) => e.course_id);
+        if (ids.length > 0) {
+          const { data } = await supabase
+            .from("timetable")
+            .select("*, courses(code, title, color)")
+            .in("course_id", ids)
+            .order("start_time");
+          setSlots(data || []);
+        }
+      } catch {
+        // network error — show empty state
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
-  }, []);
+  }, [user.id]);
 
   if (loading) return <Spinner />;
 
@@ -39,7 +44,7 @@ export default function Timetable({ user, C }) {
         Timetable
       </div>
       <div style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>
-        2024/2025 · {user?.semester || ""} Semester
+        {new Date().getFullYear()}/{new Date().getFullYear() + 1} · {user?.semester || ""} Semester
       </div>
 
       {slots.length === 0 && (

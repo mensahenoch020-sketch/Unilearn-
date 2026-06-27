@@ -13,6 +13,7 @@ export default function MessagesInbox({ user, C }) {
 
   const load = async () => {
     setLoading(true);
+    try {
     const { data: enr } = await supabase
       .from("enrollments")
       .select("course_id, courses(*)")
@@ -74,7 +75,11 @@ export default function MessagesInbox({ user, C }) {
     });
 
     setConversations(convs);
-    setLoading(false);
+    } catch {
+      // network error — show empty state
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fmtTime = (t) => {
