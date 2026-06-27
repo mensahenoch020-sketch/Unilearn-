@@ -114,7 +114,7 @@ export default function Auth({ onLogin }) {
       if (!data.user) { setError("Signup failed. Please try again."); setLoading(false); return; }
 
       // Write full profile — RLS policy allows this because signUp auto-authenticates
-      await supabase.from("profiles").upsert({
+      const { error: profileErr } = await supabase.from("profiles").upsert({
         id: data.user.id,
         name: name.trim(),
         email: email.toLowerCase().trim(),
@@ -126,6 +126,13 @@ export default function Auth({ onLogin }) {
         matric: role === "student" ? (matric || null) : null,
         staff_id: role === "lecturer" ? (staffId || null) : null,
       });
+      if (profileErr) {
+        await supabase.auth.signOut();
+        setError("Account created but profile setup failed. Please try signing in — the app will repair your profile automatically.");
+        setLoading(false);
+        switchMode("login");
+        return;
+      }
 
       // Fetch profile and log in directly — no need to go back to login screen
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
@@ -509,7 +516,7 @@ export default function Auth({ onLogin }) {
                     <label style={{ fontSize: 12, fontWeight: 600, color: "#6B6B6B", display: "block", marginBottom: 6 }}>Matric Number</label>
                     <input style={inp} value={matric} onChange={(e) => setMatric(e.target.value)} placeholder="e.g. 20/52HA001" />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 6 }}>
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: "#6B6B6B", display: "block", marginBottom: 6 }}>Level</label>
                       <select style={inp} value={level} onChange={(e) => setLevel(e.target.value)}>
@@ -519,10 +526,12 @@ export default function Auth({ onLogin }) {
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: "#6B6B6B", display: "block", marginBottom: 6 }}>Semester</label>
                       <select style={inp} value={semester} onChange={(e) => setSemester(e.target.value)}>
-                        {SEMESTERS.map((s) => <option key={s} value={s}>{s}</option>)}
+                        <option value="Harmattan">Harmattan (1st Semester)</option>
+                        <option value="Rain">Rain (2nd Semester)</option>
                       </select>
                     </div>
                   </div>
+                  <div style={{ fontSize: 11, color: "#6B6B6B", marginBottom: 14 }}>You can change this later in Settings</div>
                 </>
               )}
               {role === "lecturer" && (

@@ -22,34 +22,39 @@ export default function Dashboard({ user, C }) {
 
   useEffect(() => {
     const load = async () => {
-      const { data: ann } = await supabase
-        .from("announcements")
-        .select("*, profiles(name)")
-        .order("created_at", { ascending: false })
-        .limit(5);
+      try {
+        const { data: ann } = await supabase
+          .from("announcements")
+          .select("*, profiles(name)")
+          .order("created_at", { ascending: false })
+          .limit(5);
 
-      const { data: enr } = await supabase
-        .from("enrollments")
-        .select("*, courses(*)")
-        .eq("student_id", user.id);
-      const enrolled = (enr || []).map((e) => e.courses).filter(Boolean);
-      setEnrolledCourses(enrolled);
+        const { data: enr } = await supabase
+          .from("enrollments")
+          .select("*, courses(*)")
+          .eq("student_id", user.id);
+        const enrolled = (enr || []).map((e) => e.courses).filter(Boolean);
+        setEnrolledCourses(enrolled);
 
-      if (enrolled.length > 0) {
-        const ids = enrolled.map((c) => c.id);
-        const { data: asgn } = await supabase
-          .from("assignments")
-          .select("*, courses(code, color)")
-          .in("course_id", ids)
-          .order("due_date");
-        const upcoming = (asgn || []).filter((a) => {
-          const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
-          return days >= 0 && days <= 7;
-        });
-        setUpcomingDeadlines(upcoming);
+        if (enrolled.length > 0) {
+          const ids = enrolled.map((c) => c.id);
+          const { data: asgn } = await supabase
+            .from("assignments")
+            .select("*, courses(code, color)")
+            .in("course_id", ids)
+            .order("due_date");
+          const upcoming = (asgn || []).filter((a) => {
+            const days = Math.ceil((new Date(a.due_date) - new Date()) / 86400000);
+            return days >= 0 && days <= 7;
+          });
+          setUpcomingDeadlines(upcoming);
+        }
+        setAnnouncements(ann || []);
+      } catch {
+        // network/query error — show empty state rather than infinite spinner
+      } finally {
+        setLoading(false);
       }
-      setAnnouncements(ann || []);
-      setLoading(false);
     };
     load();
   }, [user.id]);

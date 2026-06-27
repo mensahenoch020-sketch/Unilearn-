@@ -47,36 +47,41 @@ export default function Courses({ user, C, onCall }) {
   useEffect(() => { loadCourses(); }, []);
 
   const loadCourses = async () => {
-    const { data: enrollments } = await supabase
-      .from("enrollments")
-      .select("*, courses(*)")
-      .eq("student_id", user.id);
-    const enrolled = (enrollments || []).map((e) => e.courses).filter(Boolean);
-    setCourses(enrolled);
-    const { data: all } = await supabase.from("courses").select("*").order("code");
-    setAllCourses(all || []);
+    try {
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("*, courses(*)")
+        .eq("student_id", user.id);
+      const enrolled = (enrollments || []).map((e) => e.courses).filter(Boolean);
+      setCourses(enrolled);
+      const { data: all } = await supabase.from("courses").select("*").order("code");
+      setAllCourses(all || []);
 
-    // Fetch lecturers for all enrolled courses so cards can show the name
-    const ids = enrolled.map((c) => c.id);
-    if (ids.length > 0) {
-      const { data: lcs } = await supabase
-        .from("lecturer_courses")
-        .select("course_id, lecturer_id")
-        .in("course_id", ids);
-      if (lcs?.length) {
-        const uids = [...new Set(lcs.map((l) => l.lecturer_id))];
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, name, avatar_url")
-          .in("id", uids);
-        const profMap = {};
-        (profs || []).forEach((p) => { profMap[p.id] = p; });
-        const map = {};
-        lcs.forEach((lc) => { map[lc.course_id] = profMap[lc.lecturer_id] || null; });
-        setLecturerMap(map);
+      // Fetch lecturers for all enrolled courses so cards can show the name
+      const ids = enrolled.map((c) => c.id);
+      if (ids.length > 0) {
+        const { data: lcs } = await supabase
+          .from("lecturer_courses")
+          .select("course_id, lecturer_id")
+          .in("course_id", ids);
+        if (lcs?.length) {
+          const uids = [...new Set(lcs.map((l) => l.lecturer_id))];
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, name, avatar_url")
+            .in("id", uids);
+          const profMap = {};
+          (profs || []).forEach((p) => { profMap[p.id] = p; });
+          const map = {};
+          lcs.forEach((lc) => { map[lc.course_id] = profMap[lc.lecturer_id] || null; });
+          setLecturerMap(map);
+        }
       }
+    } catch {
+      // network/query error — show empty state rather than infinite spinner
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { if (selected) loadData(); }, [selected, activeTab]);
