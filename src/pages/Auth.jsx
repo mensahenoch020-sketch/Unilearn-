@@ -48,24 +48,49 @@ export default function Auth({ onLogin }) {
     if (!email || !password) return setError("Please fill in all fields.");
     setLoading(true);
     setError("");
+    let tid;
     try {
-      const { data, error: e } = await supabase.auth.signInWithPassword({ email, password });
+      // 20-second timeout — prevents indefinite "Please wait…" hang on slow connections
+      const result = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise((_, rej) => { tid = setTimeout(() => rej(new Error("timeout")), 20000); }),
+      ]);
+      clearTimeout(tid);
+      const { data, error: e } = result;
       if (e) { setError(e.message); setLoading(false); return; }
+
       let { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
-      // Retry once if profile not yet available (e.g. just signed up)
+      // Retry once — profile write may still be in-flight right after signup
       if (!profile) {
         await new Promise(r => setTimeout(r, 2000));
         const { data: p2 } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
         profile = p2;
       }
+      // Self-repair: if signup was interrupted, rebuild the profile from auth metadata
       if (!profile) {
-        setError("Your account profile was not found. Please try signing up again or contact support.");
+        const meta = data.user.user_metadata || {};
+        await supabase.from("profiles").upsert({
+          id: data.user.id,
+          name: meta.name || data.user.email,
+          email: data.user.email,
+          role: meta.role || "student",
+        });
+        const { data: p3 } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+        profile = p3;
+      }
+      if (!profile) {
+        setError("Could not load your profile. Please contact support.");
         setLoading(false);
         return;
       }
       onLogin(profile);
-    } catch {
-      setError("Sign-in failed. Please check your connection and try again.");
+    } catch (err) {
+      clearTimeout(tid);
+      setError(
+        err.message === "timeout"
+          ? "Sign-in is taking too long. Please check your connection and try again."
+          : "Sign-in failed. Please check your connection and try again."
+      );
     }
     setLoading(false);
   };
