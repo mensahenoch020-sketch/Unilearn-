@@ -7,7 +7,7 @@ export default function Notifications({ user, C }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [user.id]);
 
   const load = async () => {
     const all = [];

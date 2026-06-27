@@ -22,9 +22,13 @@ export default function More({ user, dark, setDark, onLogout, C }) {
   const handleInstall = async () => {
     if (isIOS) { setShowIOSTip(true); return; }
     if (!installPrompt) { setShowIOSTip(true); return; }
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") { setInstallPrompt(null); setIsInstalled(true); }
+    try {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === "accepted") { setInstallPrompt(null); setIsInstalled(true); }
+    } catch {
+      setShowIOSTip(true);
+    }
   };
 
   const items = [
