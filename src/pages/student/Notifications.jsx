@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../../supabase.js";
 import Ic from "../../components/Ic.jsx";
 import Spinner from "../../components/Spinner.jsx";
 
 export default function Notifications({ user, C }) {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -133,18 +135,29 @@ export default function Notifications({ user, C }) {
 
       {items.map(item => {
         const ic = iconFor(item.type);
+        const dest = item.type === "message" ? "/messages-inbox" : "/courses";
         return (
           <div
             key={item.id}
-            style={{ background: C.card, borderRadius: 16, padding: 16, marginBottom: 10, border: `1px solid ${C.border}`, display: "flex", alignItems: "flex-start", gap: 12 }}
+            onClick={() => navigate(dest)}
+            style={{
+              background: C.card, borderRadius: 16, padding: 16, marginBottom: 10,
+              border: `1px solid ${item.type === "message" ? C.primary + "40" : C.border}`,
+              display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer",
+            }}
           >
             <div style={{ width: 44, height: 44, borderRadius: 12, background: ic.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Ic n={ic.n} s={20} c={ic.c} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 3 }}>{item.title}</div>
-              <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.desc}</div>
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 5 }}>{timeAgo(item.time)}</div>
+              <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{item.desc}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 5 }}>
+                <div style={{ fontSize: 11, color: C.muted }}>{timeAgo(item.time)}</div>
+                <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>
+                  {item.type === "message" ? "Open chat →" : "View →"}
+                </div>
+              </div>
             </div>
           </div>
         );
