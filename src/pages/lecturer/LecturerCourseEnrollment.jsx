@@ -9,21 +9,20 @@ export default function LecturerCourseEnrollment({ user, onDone, initialSelected
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const load = async () => {
-      // Filter by lecturer's faculty and department if available
-      let query = supabase.from("courses").select("*");
-      if (user.faculty) query = query.eq("faculty", user.faculty);
-      if (user.department) query = query.eq("department", user.department);
-      const { data } = await query.order("code");
-      if (!data || data.length === 0) {
-        const { data: all } = await supabase.from("courses").select("*").order("code");
-        setCourses(all || []);
-      } else {
+      try {
+        // Always fetch all courses — faculty/department filter often mismatches column values
+        const { data, error: e } = await supabase.from("courses").select("*").order("code");
+        if (e) throw e;
         setCourses(data || []);
+      } catch {
+        setError("Failed to load courses. Please check your connection and try again.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, []);
@@ -35,10 +34,27 @@ export default function LecturerCourseEnrollment({ user, onDone, initialSelected
   const save = async () => {
     if (selected.length === 0) return;
     setSaving(true);
-    const rows = selected.map((courseId) => ({ lecturer_id: user.id, course_id: courseId }));
-    await supabase.from("lecturer_courses").upsert(rows, { onConflict: "lecturer_id,course_id" });
-    setSaving(false);
-    onDone();
+    setError("");
+    try {
+      // Delete existing assignments then re-insert the full selection
+      const { error: delErr } = await supabase
+        .from("lecturer_courses")
+        .delete()
+        .eq("lecturer_id", user.id);
+      if (delErr) throw delErr;
+
+      const rows = selected.map((courseId) => ({ lecturer_id: user.id, course_id: courseId }));
+      const { error: insErr } = await supabase
+        .from("lecturer_courses")
+        .insert(rows);
+      if (insErr) throw insErr;
+
+      onDone();
+    } catch (e) {
+      setError("Failed to save courses. Make sure you are signed in as a lecturer and try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filtered = courses.filter(
@@ -96,6 +112,11 @@ export default function LecturerCourseEnrollment({ user, onDone, initialSelected
 
       {/* List */}
       <div style={{ padding: "16px 20px", paddingBottom: 120 }}>
+        {error && (
+          <div style={{ background: "#FEE2E2", color: "#EF4444", borderRadius: 12, padding: "14px 16px", marginBottom: 16, fontSize: 13, fontWeight: 600 }}>
+            {error}
+          </div>
+        )}
         {loading ? (
           <Spinner />
         ) : (
