@@ -134,12 +134,18 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   }, [selected?.id, activeTab]);
 
   const loadCourses = async () => {
-    const { data: lc } = await supabase
-      .from("lecturer_courses")
-      .select("*, courses(*)")
-      .eq("lecturer_id", user.id);
-    setCourses((lc || []).map((x) => x.courses).filter(Boolean));
-    setLoading(false);
+    try {
+      const { data: lc, error: e } = await supabase
+        .from("lecturer_courses")
+        .select("*, courses(*)")
+        .eq("lecturer_id", user.id);
+      if (e) throw e;
+      setCourses((lc || []).map((x) => x.courses).filter(Boolean));
+    } catch {
+      // network error — stay on empty state
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadAnnouncements = async () => {
@@ -345,7 +351,12 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   };
 
   const removeCourse = async (courseId) => {
-    await supabase.from("lecturer_courses").delete().eq("lecturer_id", user.id).eq("course_id", courseId);
+    const { error: e } = await supabase
+      .from("lecturer_courses")
+      .delete()
+      .eq("lecturer_id", user.id)
+      .eq("course_id", courseId);
+    if (e) { setError("Failed to remove course. Please try again."); return; }
     loadCourses();
   };
 
