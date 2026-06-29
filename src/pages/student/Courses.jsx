@@ -712,7 +712,13 @@ export default function Courses({ user, C, onCall }) {
 
       {/* Direct message with lecturer */}
       {activeTab === "messages" && (
-        <DirectMessage course={selected} user={user} C={C} otherUserId={lecturerId} otherUserName={lecturerName} />
+        <DirectMessage
+          course={selected}
+          user={user}
+          C={C}
+          otherUserId={lecturerId || lecturerMap[selected.id]?.id}
+          otherUserName={lecturerName !== "Lecturer" ? lecturerName : (lecturerMap[selected.id]?.name || "Lecturer")}
+        />
       )}
     </div>
   );

@@ -644,20 +644,15 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
             </div>
           ) : (
             <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>Student Messages</div>
-                <button onClick={loadDmStudents} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: C.muted, cursor: "pointer", fontFamily: "Inter,sans-serif" }}>
-                  Refresh
-                </button>
-              </div>
-              {dmStudents.length === 0 ? (
+              <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 16 }}>Message a Student</div>
+              {students.filter(Boolean).length === 0 ? (
                 <div style={{ textAlign: "center", color: C.muted, padding: "60px 0" }}>
                   <div style={{ fontSize: 36, marginBottom: 12 }}>💬</div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 6 }}>No messages yet</div>
-                  <div style={{ fontSize: 13 }}>Students who message you will appear here.</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 6 }}>No students enrolled</div>
+                  <div style={{ fontSize: 13 }}>Students will appear here once they enroll in this course.</div>
                 </div>
               ) : (
-                dmStudents.map(s => (
+                students.filter(Boolean).map(s => (
                   <Card C={C} key={s.id} onClick={() => setDmStudent(s)} style={{ padding: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
                     <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.primary + "20", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <Ic n="user" s={18} c={C.primary} />
