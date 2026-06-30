@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import Ic from "./Ic.jsx";
 
-export default function CallScreen({ callType, onClose }) {
-  const [status, setStatus] = useState("connecting");
-  const [roomUrl, setRoomUrl] = useState(null);
+export default function CallScreen({ callType, onClose, roomUrl: initialUrl = null, onEnd }) {
+  const [url, setUrl] = useState(initialUrl);
+  const [status, setStatus] = useState(initialUrl ? "active" : "connecting");
 
   useEffect(() => {
+    if (initialUrl) return; // already have a shared room URL
     const createRoom = async () => {
       try {
         const res = await fetch("/api/call/create", {
@@ -16,7 +17,7 @@ export default function CallScreen({ callType, onClose }) {
         if (!res.ok) { setStatus("error"); return; }
         const data = await res.json();
         if (data.url) {
-          setRoomUrl(data.url);
+          setUrl(data.url);
           setStatus("active");
         } else {
           setStatus("error");
@@ -28,7 +29,12 @@ export default function CallScreen({ callType, onClose }) {
     createRoom();
   }, [callType]);
 
-  if (roomUrl) {
+  const handleEnd = () => {
+    if (onEnd) onEnd();
+    onClose();
+  };
+
+  if (url) {
     return (
       <div
         style={{
@@ -52,7 +58,7 @@ export default function CallScreen({ callType, onClose }) {
             {callType === "video" ? "Video Call" : "Voice Call"}
           </div>
           <button
-            onClick={onClose}
+            onClick={handleEnd}
             style={{
               background: "#EF4444",
               border: "none",
@@ -67,7 +73,7 @@ export default function CallScreen({ callType, onClose }) {
           </button>
         </div>
         <iframe
-          src={roomUrl}
+          src={url}
           style={{ flex: 1, border: "none" }}
           allow="camera; microphone; fullscreen; display-capture"
           title="Call Room"
@@ -120,7 +126,7 @@ export default function CallScreen({ callType, onClose }) {
       </div>
 
       <button
-        onClick={onClose}
+        onClick={handleEnd}
         style={{
           width: 56,
           height: 56,

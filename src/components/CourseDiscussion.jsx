@@ -11,31 +11,41 @@ export default function CourseDiscussion({ course, user, C, onCall }) {
   const [expanded, setExpanded] = useState({});
   const [replyPosts, setReplyPosts] = useState({});
   const [loading, setLoading] = useState(true);
+  const [liveCall, setLiveCall] = useState(null);
+  const [startingCall, setStartingCall] = useState(false);
+  const [postError, setPostError] = useState("");
 
-  // Load posts on mount
   useEffect(() => {
     loadPosts();
 
-    // ✅ REAL-TIME: subscribe to new posts in this course
-    const channel = supabase
+    // Realtime: new forum posts
+    const forumChannel = supabase
       .channel(`forum-${course.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "forum_posts",
-          filter: `course_id=eq.${course.id}`,
-        },
-        () => {
-          // Reload posts when a new one is inserted by anyone
-          loadPosts();
-        }
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "forum_posts", filter: `course_id=eq.${course.id}` }, () => loadPosts())
+      .subscribe();
+
+    // Check for an already-active call on mount
+    supabase
+      .from("course_calls")
+      .select("*")
+      .eq("course_id", course.id)
+      .is("ended_at", null)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .then(({ data }) => { if (data?.[0]) setLiveCall(data[0]); });
+
+    // Realtime: live call start/end for this course
+    const callChannel = supabase
+      .channel(`course-calls-${course.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "course_calls", filter: `course_id=eq.${course.id}` },
+        (payload) => setLiveCall(payload.new))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "course_calls", filter: `course_id=eq.${course.id}` },
+        (payload) => { if (payload.new.ended_at) setLiveCall(null); })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(forumChannel);
+      supabase.removeChannel(callChannel);
     };
   }, [course.id]);
 
@@ -64,7 +74,33 @@ export default function CourseDiscussion({ course, user, C, onCall }) {
     setReplyPosts((prev) => ({ ...prev, [postId]: data || [] }));
   };
 
-  const [postError, setPostError] = useState("");
+  const startCall = async (type) => {
+    if (!onCall || startingCall) return;
+    setStartingCall(true);
+    try {
+      const res = await fetch("/api/call/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callType: type }),
+      });
+      if (!res.ok) return;
+      const { url, name } = await res.json();
+      if (!url) return;
+
+      // Save to DB so students can see and join
+      const { data: record } = await supabase
+        .from("course_calls")
+        .insert({ course_id: course.id, room_url: url, room_name: name, call_type: type, started_by: user.id })
+        .select()
+        .single();
+
+      onCall({ type, url, callId: record?.id || null });
+    } catch {
+      // silently fail — user still sees error from CallScreen if needed
+    } finally {
+      setStartingCall(false);
+    }
+  };
 
   const postMessage = async () => {
     if (!newPost.trim()) return;
@@ -108,21 +144,24 @@ export default function CourseDiscussion({ course, user, C, onCall }) {
 
   return (
     <div>
-      {/* Header with call buttons */}
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <div style={{ flex: 1, fontWeight: 700, fontSize: 15, color: C.text }}>Discussion</div>
-        {onCall && (
+        {/* Only lecturers can start a call */}
+        {user.role === "lecturer" && onCall && (
           <>
             <button
-              onClick={() => onCall("video")}
-              style={{ background: "#1B433218", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+              onClick={() => startCall("video")}
+              disabled={startingCall}
+              style={{ background: "#1B433218", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, opacity: startingCall ? 0.5 : 1 }}
             >
               <Ic n="video" s={16} c="#1B4332" />
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B4332" }}>Video</span>
             </button>
             <button
-              onClick={() => onCall("voice")}
-              style={{ background: "#F4A26118", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+              onClick={() => startCall("voice")}
+              disabled={startingCall}
+              style={{ background: "#F4A26118", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, opacity: startingCall ? 0.5 : 1 }}
             >
               <Ic n="phone" s={16} c="#F4A261" />
               <span style={{ fontSize: 12, fontWeight: 600, color: "#F4A261" }}>Voice</span>
@@ -130,6 +169,33 @@ export default function CourseDiscussion({ course, user, C, onCall }) {
           </>
         )}
       </div>
+
+      {/* Live call banner — visible to everyone when a call is active */}
+      {liveCall && onCall && (
+        <div
+          onClick={() => onCall({ type: liveCall.call_type, url: liveCall.room_url, callId: null })}
+          style={{
+            background: "linear-gradient(135deg, #064E3B, #065F46)",
+            borderRadius: 14,
+            padding: "14px 16px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            cursor: "pointer",
+            boxShadow: "0 4px 16px rgba(6,78,59,0.3)",
+          }}
+        >
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#34D399", flexShrink: 0, boxShadow: "0 0 0 3px rgba(52,211,153,0.3)" }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>
+              Live {liveCall.call_type === "video" ? "Video" : "Voice"} Class in Progress
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 }}>Tap to join now</div>
+          </div>
+          <Ic n={liveCall.call_type === "video" ? "video" : "phone"} s={20} c="#34D399" />
+        </div>
+      )}
 
       {/* New post box */}
       <div

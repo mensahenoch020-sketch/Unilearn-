@@ -44,7 +44,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [callType, setCallType] = useState(null);
+  const [activeCall, setActiveCall] = useState(null);
   const [selAssignment, setSelAssignment] = useState(null);
   const [showManageCourses, setShowManageCourses] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -407,7 +407,19 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   };
 
 
-  if (callType) return <CallScreen callType={callType} onClose={() => setCallType(null)} />;
+  const endCallInDb = async (callId) => {
+    if (!callId) return;
+    await supabase.from("course_calls").update({ ended_at: new Date().toISOString() }).eq("id", callId);
+  };
+
+  if (activeCall) return (
+    <CallScreen
+      callType={activeCall.type}
+      roomUrl={activeCall.url}
+      onEnd={activeCall.callId ? () => endCallInDb(activeCall.callId) : undefined}
+      onClose={() => setActiveCall(null)}
+    />
+  );
 
   if (showManageCourses) return (
     <LecturerCourseEnrollment
@@ -635,7 +647,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
           </div>
         )}
 
-        {activeTab === "discussion" && <CourseDiscussion course={selected} user={user} C={C} onCall={setCallType} />}
+        {activeTab === "discussion" && <CourseDiscussion course={selected} user={user} C={C} onCall={(data) => setActiveCall(data)} />}
 
         {activeTab === "messages" && (
           dmStudent ? (
