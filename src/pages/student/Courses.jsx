@@ -8,7 +8,7 @@ import Spinner from "../../components/Spinner.jsx";
 import CourseDiscussion from "../../components/CourseDiscussion.jsx";
 import DirectMessage from "../../components/DirectMessage.jsx";
 
-export default function Courses({ user, C }) {
+export default function Courses({ user, C, onCall }) {
   const [courses, setCourses] = useState([]);
   const [allCourses, setAllCourses] = useState([]);
   const [search, setSearch] = useState("");
@@ -707,7 +707,7 @@ export default function Courses({ user, C }) {
 
       {/* Discussion */}
       {activeTab === "discussion" && (
-        <CourseDiscussion course={selected} user={user} C={C} />
+        <CourseDiscussion course={selected} user={user} C={C} onCall={onCall} />
       )}
 
       {/* Direct message with lecturer */}

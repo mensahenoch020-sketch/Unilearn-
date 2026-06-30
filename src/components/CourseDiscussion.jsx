@@ -4,7 +4,7 @@ import Ic from "./Ic.jsx";
 import Badge from "./Badge.jsx";
 import Spinner from "./Spinner.jsx";
 
-export default function CourseDiscussion({ course, user, C }) {
+export default function CourseDiscussion({ course, user, C, onCall }) {
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState("");
   const [replies, setReplies] = useState({});
@@ -108,7 +108,28 @@ export default function CourseDiscussion({ course, user, C }) {
 
   return (
     <div>
-      <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 16 }}>Discussion</div>
+      {/* Header with call buttons */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <div style={{ flex: 1, fontWeight: 700, fontSize: 15, color: C.text }}>Discussion</div>
+        {onCall && (
+          <>
+            <button
+              onClick={() => onCall("video")}
+              style={{ background: "#1B433218", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <Ic n="video" s={16} c="#1B4332" />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#1B4332" }}>Video</span>
+            </button>
+            <button
+              onClick={() => onCall("voice")}
+              style={{ background: "#F4A26118", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <Ic n="phone" s={16} c="#F4A261" />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#F4A261" }}>Voice</span>
+            </button>
+          </>
+        )}
+      </div>
 
       {/* New post box */}
       <div
