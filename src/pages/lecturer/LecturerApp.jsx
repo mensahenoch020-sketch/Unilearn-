@@ -36,6 +36,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   const [grades, setGrades] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [annCourseId, setAnnCourseId] = useState("");
   const [timetableSlots, setTimetableSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -336,8 +337,9 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
 
   const postAnnouncement = async () => {
     if (!annForm.title || !annForm.body) return setError("Fill in all fields.");
-    await supabase.from("announcements").insert({ ...annForm, author_id: user.id });
-    setMessage("Posted!"); setAnnForm({ title: "", body: "", priority: "normal" }); setShowForm(false); loadAnnouncements();
+    if (!annCourseId) return setError("Please select a course.");
+    await supabase.from("announcements").insert({ ...annForm, course_id: Number(annCourseId), author_id: user.id });
+    setMessage("Posted!"); setAnnForm({ title: "", body: "", priority: "normal" }); setAnnCourseId(""); setShowForm(false); loadAnnouncements();
   };
 
   const addTimetableSlot = async () => {
@@ -823,6 +825,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
               <Ic n="plus" s={18} c="#fff"/>{showForm?"Cancel":"Post Announcement"}
             </button>
             {showForm && <Card C={C} style={{ padding:20, marginBottom:20 }}>
+              <div style={{ marginBottom:12 }}><label style={{ fontSize:12, fontWeight:600, color:C.muted, display:"block", marginBottom:6 }}>Course *</label><select style={inp} value={annCourseId} onChange={(e)=>setAnnCourseId(e.target.value)}><option value="">Select a course</option>{courses.map(c=><option key={c.id} value={c.id}>{c.code} — {c.title}</option>)}</select></div>
               <div style={{ marginBottom:12 }}><label style={{ fontSize:12, fontWeight:600, color:C.muted, display:"block", marginBottom:6 }}>Title *</label><input style={inp} value={annForm.title} onChange={(e)=>setAnnForm({...annForm,title:e.target.value})} placeholder="Title"/></div>
               <div style={{ marginBottom:12 }}><label style={{ fontSize:12, fontWeight:600, color:C.muted, display:"block", marginBottom:6 }}>Message *</label><textarea style={{...inp,minHeight:100,resize:"none"}} value={annForm.body} onChange={(e)=>setAnnForm({...annForm,body:e.target.value})} placeholder="Write your message..."/></div>
               <div style={{ marginBottom:16 }}><label style={{ fontSize:12, fontWeight:600, color:C.muted, display:"block", marginBottom:6 }}>Priority</label><select style={inp} value={annForm.priority} onChange={(e)=>setAnnForm({...annForm,priority:e.target.value})}><option value="normal">Normal</option><option value="high">High (Urgent)</option></select></div>
