@@ -3,7 +3,6 @@ import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../supabase.js";
 import { playNotif } from "../../utils/sound.js";
 import Ic from "../../components/Ic.jsx";
-import CallScreen from "../../components/CallScreen.jsx";
 import Dashboard from "./Dashboard.jsx";
 import Courses from "./Courses.jsx";
 import Grades from "./Grades.jsx";
@@ -30,7 +29,6 @@ const BOTTOM_NAV_PATHS = ["/", "/courses", "/grades", "/messages-inbox", "/more"
 export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [callType, setCallType] = useState(null);
   const [deadlineCount, setDeadlineCount] = useState(0);
   const [dmCount, setDmCount] = useState(0);
 
@@ -104,7 +102,6 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
     }
   }, []);
 
-  if (callType) return <CallScreen callType={callType} onClose={() => setCallType(null)} />;
 
   const showBottomNav = BOTTOM_NAV_PATHS.includes(pathname);
 
@@ -150,7 +147,7 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
       <div style={{ padding: "20px 20px", paddingBottom: showBottomNav ? 100 : 40 }}>
         <Routes>
           <Route path="/" element={<Dashboard user={user} C={C} />} />
-          <Route path="/courses" element={<Courses user={user} C={C} onCall={setCallType} />} />
+          <Route path="/courses" element={<Courses user={user} C={C} />} />
           <Route path="/grades" element={<Grades user={user} C={C} />} />
           <Route path="/timetable" element={<Timetable user={user} C={C} />} />
           <Route path="/attendance" element={<Attendance user={user} C={C} />} />

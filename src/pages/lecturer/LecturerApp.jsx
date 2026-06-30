@@ -7,7 +7,6 @@ import { ALLOWED_MATERIAL_TYPES, MAX_FILE_SIZE_MB } from "../../data.js";
 import Ic from "../../components/Ic.jsx";
 import Badge from "../../components/Badge.jsx";
 import Spinner from "../../components/Spinner.jsx";
-import CallScreen from "../../components/CallScreen.jsx";
 import CourseDiscussion from "../../components/CourseDiscussion.jsx";
 import DirectMessage from "../../components/DirectMessage.jsx";
 import LecturerCourseEnrollment from "./LecturerCourseEnrollment.jsx";
@@ -45,7 +44,6 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selAssignment, setSelAssignment] = useState(null);
-  const [callType, setCallType] = useState(null);
   const [showManageCourses, setShowManageCourses] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [dmStudents, setDmStudents] = useState([]);
@@ -406,7 +404,6 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
     setDmStudents(profs || []);
   };
 
-  if (callType) return <CallScreen callType={callType} onClose={() => setCallType(null)} />;
 
   if (showManageCourses) return (
     <LecturerCourseEnrollment
@@ -634,7 +631,7 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
           </div>
         )}
 
-        {activeTab === "discussion" && <CourseDiscussion course={selected} user={user} C={C} onCall={setCallType} />}
+        {activeTab === "discussion" && <CourseDiscussion course={selected} user={user} C={C} />}
 
         {activeTab === "messages" && (
           dmStudent ? (
