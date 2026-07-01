@@ -147,8 +147,8 @@ export default function CourseDiscussion({ course, user, C, onCall }) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <div style={{ flex: 1, fontWeight: 700, fontSize: 15, color: C.text }}>Discussion</div>
-        {/* Only lecturers can start a call */}
-        {user.role === "lecturer" && onCall && (
+        {/* Any user can start a call — it saves to course_calls so others see the banner */}
+        {onCall && (
           <>
             <button
               onClick={() => startCall("video")}

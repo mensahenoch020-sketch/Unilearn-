@@ -95,6 +95,11 @@ export default function StudentApp({ user, setUser, dark, setDark, C, onLogout }
     return () => supabase.removeChannel(ch);
   }, [user.id]);
 
+  // Clear message badge whenever the user lands on the messages page (any navigation method)
+  useEffect(() => {
+    if (pathname === "/messages-inbox") setDmCount(0);
+  }, [pathname]);
+
   // After login, redirect to any pending attendance scan URL
   useEffect(() => {
     const redirect = sessionStorage.getItem("attend_redirect");
