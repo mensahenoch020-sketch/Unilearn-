@@ -48,6 +48,10 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
   const [selAssignment, setSelAssignment] = useState(null);
   const [showManageCourses, setShowManageCourses] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [editName, setEditName] = useState(user?.name || "");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [dmStudents, setDmStudents] = useState([]);
   const [dmStudent, setDmStudent] = useState(null);
   const [aForm, setAForm] = useState({ title: "", description: "", due_date: "", max_score: 20 });
@@ -925,6 +929,56 @@ export default function LecturerApp({ user, setUser, dark, setDark, C, onLogout 
               <div onClick={()=>setDark(!dark)} style={{ width:50, height:28, borderRadius:14, background:dark?C.primary:C.border, position:"relative", cursor:"pointer", transition:"background 0.3s" }}>
                 <div style={{ position:"absolute", top:4, left:dark?26:4, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"left 0.3s", boxShadow:"0 1px 3px rgba(0,0,0,0.2)" }}/>
               </div>
+            </Card>
+            <Card C={C} style={{ padding:16, marginBottom:10 }}>
+              <div style={{ fontWeight:700, fontSize:13, color:C.text, marginBottom:10 }}>Display Name</div>
+              <input
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 12px", fontSize:14, color:C.text, background:C.inputBg, outline:"none", fontFamily:"Inter,sans-serif" }}
+              />
+              <button
+                onClick={async () => {
+                  if (!editName.trim()) return;
+                  const { error: err } = await supabase.from("profiles").update({ name: editName.trim() }).eq("id", user.id);
+                  if (err) { setError("Failed to save name."); setMessage(""); }
+                  else { setUser({ ...user, name: editName.trim() }); setMessage("Name updated!"); setError(""); }
+                }}
+                style={{ marginTop:10, background:C.primary, color:"#fff", border:"none", borderRadius:10, padding:"10px 0", width:"100%", fontWeight:700, fontSize:14, cursor:"pointer", fontFamily:"Inter,sans-serif" }}
+              >Save Name</button>
+            </Card>
+            <Card C={C} style={{ padding:16, marginBottom:10 }}>
+              <div style={{ fontWeight:700, fontSize:13, color:C.text, marginBottom:10 }}>Change Password</div>
+              <div style={{ position:"relative", marginBottom:10 }}>
+                <input
+                  type={showPw ? "text" : "password"}
+                  placeholder="New password"
+                  value={newPw}
+                  onChange={e => setNewPw(e.target.value)}
+                  style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 40px 10px 12px", fontSize:14, color:C.text, background:C.inputBg, outline:"none", fontFamily:"Inter,sans-serif" }}
+                />
+                <button onClick={() => setShowPw(!showPw)} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer" }}>
+                  <Ic n={showPw ? "eyeOff" : "eye"} s={16} c={C.muted} />
+                </button>
+              </div>
+              <input
+                type={showPw ? "text" : "password"}
+                placeholder="Confirm new password"
+                value={confirmPw}
+                onChange={e => setConfirmPw(e.target.value)}
+                style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 12px", fontSize:14, color:C.text, background:C.inputBg, outline:"none", fontFamily:"Inter,sans-serif", marginBottom:10 }}
+              />
+              <button
+                onClick={async () => {
+                  if (!newPw || !confirmPw) { setError("Fill in both password fields."); setMessage(""); return; }
+                  if (newPw !== confirmPw) { setError("Passwords don't match."); setMessage(""); return; }
+                  if (newPw.length < 6) { setError("Minimum 6 characters."); setMessage(""); return; }
+                  const { error: err } = await supabase.auth.updateUser({ password: newPw });
+                  if (err) { setError("Failed to change password."); setMessage(""); }
+                  else { setNewPw(""); setConfirmPw(""); setMessage("Password changed!"); setError(""); }
+                }}
+                style={{ background:C.primary, color:"#fff", border:"none", borderRadius:10, padding:"10px 0", width:"100%", fontWeight:700, fontSize:14, cursor:"pointer", fontFamily:"Inter,sans-serif" }}
+              >Change Password</button>
             </Card>
             <button
               onClick={async () => { setSigningOut(true); await onLogout(); setSigningOut(false); }}
