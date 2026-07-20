@@ -9,7 +9,7 @@ import StudentApp from "./pages/student/StudentApp.jsx";
 import LecturerApp from "./pages/lecturer/LecturerApp.jsx";
 import LecturerCourseEnrollment from "./pages/lecturer/LecturerCourseEnrollment.jsx";
 import Onboarding from "./pages/student/Onboarding.jsx";
-import AdminApp from "./pages/admin/AdminApp.jsx";   // <-- Added for Admin panel
+import AdminApp from "./pages/Admin/AdminApp.jsx";   // <-- Added for Admin panel
 
 function SplashScreen() {
   const [slow, setSlow] = useState(false);
